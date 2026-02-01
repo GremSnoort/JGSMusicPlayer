@@ -21,11 +21,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
 
 data class AudioFile(
     val name: String,
@@ -39,52 +44,147 @@ data class VideoFile(
     val uri: Uri
 )
 
+data class PlayerUiState(
+    val nowPlaying: AudioFile? = null,
+    val isPlaying: Boolean = false,
+    val durationMs: Long = 0L,
+    val positionMs: Long = 0L
+)
+
+data class PlayerActions(
+    val openNow: () -> Unit,
+    val playPause: () -> Unit,
+    val stop: () -> Unit,
+    val playTrack: (AudioFile) -> Unit
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                Mp3BrowserAndPlayer()
+                App()
             }
         }
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun Mp3BrowserAndPlayer() {
+private fun App() {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val navController = rememberNavController()
+    var uiState by remember { mutableStateOf(PlayerUiState()) }
+    val latestUiState by rememberUpdatedState(uiState)
 
     val player = remember { ExoPlayer.Builder(context).build() }
+    val actions = PlayerActions(
+        openNow = { navController.navigate("player") { launchSingleTop = true } },
 
-    var hasPermission by remember { mutableStateOf(false) }
-    var files by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
-    var selectedFolder by remember { mutableStateOf<String?>(null) }
-    var nowPlaying by remember { mutableStateOf<AudioFile?>(null) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
+        playPause = {
+            if (latestUiState.isPlaying) player.pause() else player.play()
+        },
+
+        stop = {
+            player.stop()
+            player.clearMediaItems()
+            uiState = latestUiState.copy(
+                nowPlaying = null,
+                isPlaying = false,
+                durationMs = 0L,
+                positionMs = 0L
+            )
+        },
+
+        playTrack = { f ->
+            player.stop()
+            player.clearMediaItems()
+            player.setMediaItem(MediaItem.fromUri(f.uri))
+            player.prepare()
+            player.play()
+            uiState = latestUiState.copy(nowPlaying = f, isPlaying = true)
+            navController.navigate("player") { launchSingleTop = true }
+        }
+    )
+
+    LaunchedEffect(player) {
+        while (true) {
+            val d = player.duration
+            val p = player.currentPosition
+
+            val newDuration = if (d > 0) d else 0L
+            val newPosition = if (p > 0) p else 0L
+
+            val cur = latestUiState
+            if (cur.durationMs != newDuration || cur.positionMs != newPosition) {
+                uiState = cur.copy(durationMs = newDuration, positionMs = newPosition)
+            }
+
+            delay(250)
+        }
+    }
 
     DisposableEffect(player) {
-        val listener = object : androidx.media3.common.Player.Listener {
+        onDispose {
+            player.release()
+        }
+    }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
+                uiState = latestUiState.copy(isPlaying = playing)
             }
 
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == androidx.media3.common.Player.STATE_ENDED) {
-                    nowPlaying = null
+                if (state == Player.STATE_ENDED) {
+                    uiState = latestUiState.copy(
+                        nowPlaying = null,
+                        isPlaying = false,
+                        durationMs = 0L,
+                        positionMs = 0L
+                    )
                     player.clearMediaItems()
                 }
             }
         }
 
         player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
 
-        onDispose {
-            player.removeListener(listener)
-            player.release()
+    NavHost(navController = navController, startDestination = "library") {
+        composable("library") {
+            Mp3BrowserAndPlayer(
+                navController = navController,
+                player = player,
+                uiState = latestUiState,
+                actions = actions
+            )
+        }
+        composable("player") {
+            PlayerScreen(
+                onBack = { navController.popBackStack() },
+                player = player,
+                uiState = latestUiState,
+                actions = actions
+            )
         }
     }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun Mp3BrowserAndPlayer(
+    navController: androidx.navigation.NavHostController,
+    player: ExoPlayer,
+    uiState: PlayerUiState,
+    actions: PlayerActions
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var hasPermission by remember { mutableStateOf(false) }
+    var files by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
+    var selectedFolder by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -93,7 +193,7 @@ private fun Mp3BrowserAndPlayer() {
         if (granted) files = queryAudio(context)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(player) {
         val granted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.READ_MEDIA_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
@@ -120,6 +220,13 @@ private fun Mp3BrowserAndPlayer() {
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            if (uiState.nowPlaying != null) {
+                FloatingActionButton(onClick = actions.openNow) {
+                    Text("Now")
+                }
+            }
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -143,30 +250,26 @@ private fun Mp3BrowserAndPlayer() {
             }
 
             // Панель управления
-            if (nowPlaying != null) {
+            if (uiState.nowPlaying != null) {
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .padding(12.dp)
                 ) {
                     Text(
-                        "Playing: ${nowPlaying!!.name}",
-                        modifier = Modifier.weight(1f)
+                        "Playing: ${uiState.nowPlaying!!.name}",
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { actions.openNow() }
                     )
 
-                    Button(onClick = {
-                        if (isPlaying) player.pause() else player.play()
-                    }) {
-                        Text(if (isPlaying) "Pause" else "Play")
+                    Button(onClick = actions.playPause) {
+                        Text(if (uiState.isPlaying) "Pause" else "Play")
                     }
 
                     Spacer(Modifier.width(8.dp))
 
-                    Button(onClick = {
-                        player.stop()
-                        player.clearMediaItems()
-                        nowPlaying = null
-                    }) { Text("Stop") }
+                    Button(onClick = { actions.stop() }) { Text("Stop") }
 
                 }
                 HorizontalDivider()
@@ -217,14 +320,7 @@ private fun Mp3BrowserAndPlayer() {
                     items(filtered) { f ->
                         ListItem(
                             headlineContent = { Text(f.name) },
-                            modifier = Modifier.clickable {
-                                nowPlaying = f
-                                player.stop()
-                                player.clearMediaItems()
-                                player.setMediaItem(MediaItem.fromUri(f.uri))
-                                player.prepare()
-                                player.play()
-                            }
+                            modifier = Modifier.clickable { actions.playTrack(f) }
                         )
                         HorizontalDivider()
                     }
@@ -232,6 +328,113 @@ private fun Mp3BrowserAndPlayer() {
             }
         }
     }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerScreen(
+    onBack: () -> Unit,
+    player: ExoPlayer,
+    uiState: PlayerUiState,
+    actions: PlayerActions
+) {
+    var isUserSeeking by remember { mutableStateOf(false) }
+    var seekPreviewMs by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(uiState.positionMs) {
+        if (!isUserSeeking) {
+            seekPreviewMs = uiState.positionMs
+        }
+    }
+
+    val safeDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
+    val sliderValue = (seekPreviewMs.coerceIn(0L, safeDuration)).toFloat() / safeDuration.toFloat()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Player") },
+                navigationIcon = {
+                    Text(
+                        "←",
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .clickable { onBack() }
+                    )
+                }
+            )
+        }
+    ) { padding ->
+        Column(Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
+
+            if (uiState.nowPlaying == null) {
+                LaunchedEffect(uiState.nowPlaying) { onBack() }
+                return@Column
+            }
+
+            Text(uiState.nowPlaying.name, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Text(formatMs(seekPreviewMs))
+                Spacer(Modifier.weight(1f))
+                Text(formatRemainingMs(seekPreviewMs, uiState.durationMs))
+            }
+            Spacer(Modifier.height(12.dp))
+
+            Slider(
+                value = sliderValue,
+                onValueChange = { v ->
+                    isUserSeeking = true
+                    seekPreviewMs = (v * safeDuration).toLong()
+                },
+                onValueChangeFinished = {
+                    player.seekTo(seekPreviewMs)
+                    isUserSeeking = false
+                }
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = {
+                        val target = (player.currentPosition - 10_000).coerceAtLeast(0L)
+                        player.seekTo(target)
+                    }
+                ) { Text("⟲ 10s") }
+                Button(
+                    onClick = {
+                        val dur = if (player.duration > 0) player.duration else uiState.durationMs
+                        val target = (player.currentPosition + 10_000).coerceAtMost(if (dur > 0) dur else Long.MAX_VALUE)
+                        player.seekTo(target)
+                    }
+                ) { Text("10s ⟳") }
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = actions.playPause) {
+                    Text(if (uiState.isPlaying) "Pause" else "Play")
+                }
+                Button(onClick = actions.stop) { Text("Stop") }
+            }
+        }
+    }
+}
+
+private fun formatMs(ms: Long): String {
+    if (ms <= 0) return "0:00"
+    val totalSec = ms / 1000
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return "${min}:${sec.toString().padStart(2, '0')}"
+}
+
+private fun formatRemainingMs(positionMs: Long, durationMs: Long): String {
+    val remain = (durationMs - positionMs).coerceAtLeast(0L)
+    val totalSec = remain / 1000
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return "-${min}:${sec.toString().padStart(2, '0')}"
 }
 
 private fun queryVideo(context: Context): List<VideoFile> {
