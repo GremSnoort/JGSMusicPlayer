@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,6 +26,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -67,7 +73,25 @@ private fun App() {
         openNow = { navController.navigate("player") { launchSingleTop = true } },
 
         playPause = {
-            if (latestUiState.isPlaying) player.pause() else player.play()
+            val curTrack = latestUiState.nowPlaying ?: return@PlayerActions
+
+            when {
+                player.playbackState == Player.STATE_ENDED -> {
+                    player.seekTo(0)
+                    player.play()
+                    return@PlayerActions
+                }
+
+                player.mediaItemCount == 0 -> {
+                    player.setMediaItem(MediaItem.fromUri(curTrack.uri))
+                    player.prepare()
+                    player.play()
+                    return@PlayerActions
+                }
+
+                latestUiState.isPlaying -> player.pause()
+                else -> player.play()
+            }
         },
 
         stop = {
@@ -122,13 +146,14 @@ private fun App() {
 
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED) {
+                    player.pause()
+                    player.seekTo(0)
+
                     uiState = latestUiState.copy(
-                        nowPlaying = null,
                         isPlaying = false,
-                        durationMs = 0L,
-                        positionMs = 0L
+                        positionMs = 0L,
+                        durationMs = (player.duration.takeIf { it > 0 } ?: latestUiState.durationMs)
                     )
-                    player.clearMediaItems()
                 }
             }
         }
@@ -191,6 +216,27 @@ private fun Mp3BrowserAndPlayer(
 
     val folders = remember(files) { files.groupBy { it.folder }.toSortedMap() }
 
+    val focusManager = LocalFocusManager.current
+
+    fun backFromFolder() {
+        selectedFolder = null
+        query = ""
+        focusManager.clearFocus()
+    }
+
+// --- swipe from RIGHT edge to go back (только когда папка открыта) ---
+    val density = LocalDensity.current
+    val cfg = LocalConfiguration.current
+    val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
+
+    val edgePx = with(density) { 28.dp.toPx() }      // зона у правого края
+    val triggerPx = with(density) { 72.dp.toPx() }   // сколько тянуть до срабатывания
+
+    var dragSum by remember { mutableStateOf(0f) }
+    var backTriggered by remember { mutableStateOf(false) }
+    var isEdgeDrag by remember { mutableStateOf(false) }
+// ---------------------------------------------------------------
+
     // --- стиль как у плеера ---
     val SeaBorder = Brush.linearGradient(
         listOf(
@@ -208,6 +254,35 @@ private fun Mp3BrowserAndPlayer(
         modifier = Modifier
             .fillMaxSize()
             .background(com.example.jgsmusicplayer.ui.theme.PlayerBg)
+            .pointerInput(selectedFolder) {} // чтобы корректно пересоздавался жест при входе/выходе из папки
+            .draggable(
+                orientation = Orientation.Horizontal,
+                state = rememberDraggableState { delta ->
+                    // жест активен ТОЛЬКО когда открыта папка
+                    if (selectedFolder == null) return@rememberDraggableState
+                    if (!isEdgeDrag || backTriggered) return@rememberDraggableState
+
+                    dragSum += delta
+                    if (dragSum <= -triggerPx) {
+                        backTriggered = true
+                        backFromFolder()
+                    }
+                },
+                onDragStarted = { startOffset ->
+                    if (selectedFolder == null) return@draggable
+
+                    dragSum = 0f
+                    backTriggered = false
+
+                    val fromRight = startOffset.x >= (screenWidthPx - edgePx)
+                    isEdgeDrag = fromRight
+                },
+                onDragStopped = {
+                    isEdgeDrag = false
+                    dragSum = 0f
+                    backTriggered = false
+                }
+            )
     ) {
         Scaffold(
             containerColor = Color.Transparent,

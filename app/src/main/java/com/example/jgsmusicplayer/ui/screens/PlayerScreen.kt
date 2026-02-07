@@ -169,9 +169,9 @@ fun PlayerScreen(
 
                 val timeBrush = Brush.linearGradient(
                     listOf(
-                        Color(0xFF2EE6FF), // cyan
-                        Color(0xFF32FFA7), // green
-                        Color(0xFF9E6BFF)  // purple
+                        Color(0xFF85EEFF), // cyan
+                        Color(0xFF9EFFD3), // green
+                        Color(0xFFDECBFF)  // purple
                     )
                 )
 
