@@ -20,11 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,16 +44,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.common.Player
 
 import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
 import com.example.jgsmusicplayer.ui.theme.PlayerBg
+import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.components.ArcSeekBar
 
 private fun formatMs(ms: Long): String {
@@ -106,40 +107,57 @@ fun PlayerScreen(
     val sliderValue = (seekPreviewMs.coerceIn(0L, safeDuration)).toFloat() / safeDuration.toFloat()
     val screenInset = 24.dp // 12–28.dp
 
+    // --- swipe from RIGHT edge to go back ---
+    val density = LocalDensity.current
+    val cfg = LocalConfiguration.current
+    val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
+
+    val edgePx = with(density) { 28.dp.toPx() }      // `right border` zone
+    val triggerPx = with(density) { 72.dp.toPx() }   // swipe level
+
+    var dragSum by remember { mutableStateOf(0f) }
+    var backTriggered by remember { mutableStateOf(false) }
+    var isEdgeDrag by remember { mutableStateOf(false) }
+    // ---------------------------------------
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(PlayerBg)
-            .padding(top = screenInset, bottom = screenInset),
+            .padding(top = screenInset, bottom = screenInset)
+            .pointerInput(uiState.nowPlaying) {}
+            .draggable(
+                orientation = Orientation.Horizontal,
+                state = rememberDraggableState { delta ->
+                    if (!isEdgeDrag || backTriggered) return@rememberDraggableState
+                    dragSum += delta
+                    if (dragSum <= -triggerPx) {
+                        backTriggered = true
+                        onBack()
+                    }
+                },
+                onDragStarted = { startOffset ->
+                    dragSum = 0f
+                    backTriggered = false
+
+                    val fromRight = startOffset.x >= (screenWidthPx - edgePx)
+                    isEdgeDrag = fromRight
+                },
+                onDragStopped = {
+                    isEdgeDrag = false
+                    dragSum = 0f
+                    backTriggered = false
+                }
+            )
     ) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    GlassBackButton(
-                        onClick = onBack,
-                        modifier = Modifier.padding(start = 0.dp)
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        uiState.nowPlaying?.let {
-                            TrackTitleWave(
-                                title = it.name,
-                                modifier = Modifier.padding(horizontal = 12.dp) // чтобы не налезал на стрелку
-                            )
-                        }
-                    }
-                }
+                NeonTopBar(
+                    title = uiState.nowPlaying?.name.orEmpty(),
+                    showBack = true,
+                    onBack = onBack
+                )
             }
         ) { padding ->
             Column(Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
@@ -212,7 +230,7 @@ fun PlayerScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(Color(0x14000000)) // лёгкая дымка
+                                .background(Color(0x14000000))
                                 .border(
                                     width = 1.dp,
                                     color = Color.White.copy(alpha = 0.10f),
@@ -480,92 +498,4 @@ private fun GhostIconButton(
             )
         }
     }
-}
-
-@Composable
-private fun GlassBackButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    size: Dp = 52.dp
-) {
-    val interaction = remember { MutableInteractionSource() }
-
-    Box(
-        modifier = modifier
-            .padding(start = 10.dp)
-            .size(size) // удобная зона тапа
-            .clickable(
-                interactionSource = interaction,
-                indication = null
-            ) { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "←", //"❮"
-            modifier = Modifier.offset(y = (-5).dp),
-            color = Color.White.copy(alpha = 0.96f),
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Black,
-            style = TextStyle(
-                shadow = Shadow(
-                    color = Color.Black.copy(alpha = 0.35f),
-                    offset = Offset(0f, 2f),
-                    blurRadius = 8f
-                )
-            )
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun TrackTitleWave(
-    title: String,
-    modifier: Modifier = Modifier
-) {
-    val transition = rememberInfiniteTransition(label = "titleWaveSingle")
-    val t by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2600),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "titleWaveSingleT"
-    )
-
-    val brush = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF80EBFF),
-            Color(0xFF9CFFD4),
-            Color(0xFFA7D8FF),
-            Color(0xFF97EFFF)
-        ),
-        start = Offset(0f + 260f * t, 0f),
-        end = Offset(900f - 260f * t, 0f)
-    )
-
-    Text(
-        text = title,
-        modifier = modifier
-            .basicMarquee(
-                iterations = Int.MAX_VALUE,
-                repeatDelayMillis = 900,
-                initialDelayMillis = 900,
-                velocity = 35.dp
-            ),
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Clip, // <-- важно: не Ellipsis
-        style = MaterialTheme.typography.titleLarge.copy(
-            brush = brush,
-            fontWeight = FontWeight.Bold,
-            shadow = Shadow(
-                color = Color(0x662EE6FF),
-                offset = Offset(0f, 0f),
-                blurRadius = 12f
-            )
-        ),
-        fontSize = 20.sp
-    )
 }

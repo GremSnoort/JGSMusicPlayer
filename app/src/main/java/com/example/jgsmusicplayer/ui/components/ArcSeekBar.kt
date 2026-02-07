@@ -124,7 +124,6 @@ fun ArcSeekBar(
                     },
                     onDragCancel = { isDragging = false },
                     onDrag = { change, _ ->
-                        // IMPORTANT: не change.consume() обязательно, но можно
                         val size = this.size
                         val center = Offset(size.width / 2f, size.height / 2f)
                         val p = progressFromTouch(change.position, center)
