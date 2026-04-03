@@ -41,6 +41,8 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
+import com.example.jgsmusicplayer.ui.theme.JGSTheme
+
 @Composable
 fun ArcSeekBar(
     modifier: Modifier = Modifier,
@@ -50,36 +52,33 @@ fun ArcSeekBar(
     onCenterClick: (() -> Unit)? = null,
 
     // вид
-    strokeWidth: Dp = 10.dp,
+    strokeWidth: Dp? = null,
     gapDegrees: Float = 70f,         // размер "пропуска" (незамкнутость)
     startAngleDegrees: Float = 125f, // где начинается дуга (примерно как в плеерах)
-    trackBrush: Brush = Brush.linearGradient(
-        listOf(Color(0x33FFFFFF), Color(0x1AFFFFFF))
-    ),
-    progressBrush: Brush = Brush.sweepGradient(
-        listOf(
-            Color(0xFF2EE6FF),
-            Color(0xFF32FFA7),
-            Color(0xFF9E6BFF),
-            Color(0xFF2EE6FF)
-        )
-    ),
-    knobColor: Color = Color(0xFFEAFBFF),
-    knobRadius: Dp = 6.dp,
+    trackBrush: Brush? = null,
+    progressBrush: Brush? = null,
+    knobColor: Color? = null,
+    knobRadius: Dp? = null,
 
     // центр (обложка / контент)
     centerContent: @Composable BoxScope.() -> Unit = {}
 ) {
+    val design = JGSTheme.design
+    val resolvedStrokeWidth = strokeWidth ?: design.sizes.seekBarStroke
+    val resolvedTrackBrush = trackBrush ?: design.brushes.seekTrack
+    val resolvedProgressBrush = progressBrush ?: design.brushes.seekProgress
+    val resolvedKnobColor = knobColor ?: design.colors.seekKnob
+    val resolvedKnobRadius = knobRadius ?: design.sizes.seekBarKnob
     var isDragging by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val flash = remember { Animatable(0f) } // 0..1
     val wave = remember { Animatable(0f) }  // 0..1 (фаза волны)
 
     val density = LocalDensity.current
-    val centerRadiusPx = with(density) { 64.dp.toPx() }
+    val centerRadiusPx = with(density) { design.sizes.seekCenterTouchRadius.toPx() }
 
-    val swPx = with(LocalDensity.current) { strokeWidth.toPx() }
-    val knobRpx = with(LocalDensity.current) { knobRadius.toPx() }
+    val swPx = with(LocalDensity.current) { resolvedStrokeWidth.toPx() }
+    val knobRpx = with(LocalDensity.current) { resolvedKnobRadius.toPx() }
 
     // Длина дуги = 360 - gap
     val sweepTotal = 360f - gapDegrees
@@ -184,7 +183,7 @@ fun ArcSeekBar(
 
             // трек (фон дуги)
             drawArc(
-                brush = trackBrush,
+                brush = resolvedTrackBrush,
                 startAngle = startAngleDegrees,
                 sweepAngle = sweepTotal,
                 useCenter = false,
@@ -196,7 +195,7 @@ fun ArcSeekBar(
             // прогресс (дуга)
             val sweepProgress = sweepTotal * clamp01(progress)
             drawArc(
-                brush = progressBrush,
+                brush = resolvedProgressBrush,
                 startAngle = startAngleDegrees,
                 sweepAngle = sweepProgress,
                 useCenter = false,
@@ -211,7 +210,7 @@ fun ArcSeekBar(
             val cy = (h / 2f) + sin(angle).toFloat() * radius
 
             drawCircle(
-                color = knobColor.copy(alpha = if (isDragging) 1f else 0.9f),
+                color = resolvedKnobColor.copy(alpha = if (isDragging) 1f else 0.9f),
                 radius = knobRpx,
                 center = Offset(cx, cy)
             )
@@ -219,9 +218,8 @@ fun ArcSeekBar(
 
         // Центр (обложка) — кликабельный
         val interaction = remember { MutableInteractionSource() }
-        // диаметр центра (чем меньше — тем меньше зона клика)
-        val centerDiameter = 300.dp   // было примерно 2*(радиус 64dp)=128dp
-        val centerPadding = 28.dp     // визуальный отступ
+        val centerDiameter = design.sizes.seekCenterDiameter
+        val centerPadding = design.sizes.seekCenterPadding
 
         Box(
             modifier = Modifier
@@ -277,36 +275,21 @@ fun ArcSeekBar(
 
                     val cx = w * 0.5f + kotlin.math.cos(t) * w * 0.10f
                     val cy = h * 0.5f + kotlin.math.sin(t * 1.3f) * h * 0.08f
-                    val center = Offset(cx, cy)
-
-                    val seaColors = listOf(
-                        Color(0xFF2EE6FF), // cyan
-                        Color(0xFF32FFA7), // green
-                        Color(0xFF9E6BFF), // purple
-                        Color(0xFF2EE6FF)  // back
-                    )
-
+                    val dynamicCenter = Offset(cx, cy)
                     drawRect(
                         brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0x332EE6FF),
-                                Color(0x2232FFA7),
-                                Color(0x1A9E6BFF),
-                                Color.Transparent
-                            ),
-                            center = center,
-                            radius = (minOf(w, h) * 0.75f)
-                        )
+                            colors = design.colors.seekWaveGlowColors,
+                            center = dynamicCenter,
+                            radius = minOf(w, h) * 0.75f
+                        ),
+                        alpha = flash.value,
+                        topLeft = Offset.Zero,
+                        size = size
                     )
 
                     drawRect(
                         brush = Brush.sweepGradient(
-                            colors = listOf(
-                                Color(0x142EE6FF),
-                                Color(0x1432FFA7),
-                                Color(0x149E6BFF),
-                                Color(0x142EE6FF)
-                            ),
+                            colors = design.colors.seekWaveSweepColors,
                             center = Offset(w * 0.5f, h * 0.5f)
                         )
                     )
@@ -316,9 +299,10 @@ fun ArcSeekBar(
 
                     drawCircle(
                         brush = Brush.sweepGradient(
-                            colors = seaColors.map { it.copy(alpha = 0.55f * ringAlpha) },
+                            colors = design.colors.seekWaveRingColors,
                             center = Offset(w * 0.5f, h * 0.5f)
                         ),
+                        alpha = ringAlpha,
                         radius = (minOf(w, h) * 0.5f) - ringWidth * 0.7f,
                         center = Offset(w * 0.5f, h * 0.5f),
                         style = Stroke(width = ringWidth, cap = StrokeCap.Round)

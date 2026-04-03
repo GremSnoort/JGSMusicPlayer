@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,9 +54,11 @@ import androidx.compose.ui.platform.LocalDensity
 
 import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
-import com.example.jgsmusicplayer.ui.theme.PlayerBg
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.components.ArcSeekBar
+import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
+import com.example.jgsmusicplayer.ui.theme.JGSTheme
+import com.example.jgsmusicplayer.ui.theme.JGSThemedBackground
 
 private fun formatMs(ms: Long): String {
     if (ms <= 0) return "0:00"
@@ -81,6 +84,7 @@ fun PlayerScreen(
     onDismissError: () -> Unit,
     actions: PlayerActions
 ) {
+    val design = JGSTheme.design
     BackHandler(onBack = onBack)
 
     var isUserSeeking by remember { mutableStateOf(false) }
@@ -94,167 +98,177 @@ fun PlayerScreen(
 
     val safeDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
     val sliderValue = (seekPreviewMs.coerceIn(0L, safeDuration)).toFloat() / safeDuration.toFloat()
-    val screenInset = 24.dp // 12–28.dp
+    val screenInset = design.sizes.playerScreenInset
 
     // --- swipe from RIGHT edge to go back ---
     val density = LocalDensity.current
     val cfg = LocalConfiguration.current
     val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
 
-    val edgePx = with(density) { 28.dp.toPx() }      // `right border` zone
-    val triggerPx = with(density) { 72.dp.toPx() }   // swipe level
+    val edgePx = with(density) { design.sizes.edgeSwipeZone.toPx() }
+    val triggerPx = with(density) { design.sizes.edgeSwipeTrigger.toPx() }
 
     var dragSum by remember { mutableStateOf(0f) }
     var backTriggered by remember { mutableStateOf(false) }
     var isEdgeDrag by remember { mutableStateOf(false) }
     // ---------------------------------------
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PlayerBg)
-            .padding(top = screenInset, bottom = screenInset)
-            .pointerInput(uiState.nowPlaying) {}
-            .draggable(
-                orientation = Orientation.Horizontal,
-                state = rememberDraggableState { delta ->
-                    if (!isEdgeDrag || backTriggered) return@rememberDraggableState
-                    dragSum += delta
-                    if (dragSum <= -triggerPx) {
-                        backTriggered = true
-                        onBack()
-                    }
-                },
-                onDragStarted = { startOffset ->
-                    dragSum = 0f
-                    backTriggered = false
+    Box(modifier = Modifier.fillMaxSize()) {
+        JGSThemedBackground(
+            target = JGSBackgroundTarget.PLAYER,
+            modifier = Modifier.fillMaxSize()
+        )
 
-                    val fromRight = startOffset.x >= (screenWidthPx - edgePx)
-                    isEdgeDrag = fromRight
-                },
-                onDragStopped = {
-                    isEdgeDrag = false
-                    dragSum = 0f
-                    backTriggered = false
-                }
-            )
-    ) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                NeonTopBar(
-                    title = uiState.nowPlaying?.name.orEmpty(),
-                    showBack = true,
-                    onBack = onBack
-                )
-            }
-        ) { padding ->
-            Column(Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
-
-                if (uiState.nowPlaying == null) {
-                    LaunchedEffect(uiState.nowPlaying) { onBack() }
-                    return@Column
-                }
-
-                uiState.errorMessage?.let { errorMessage ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color(0x22FF5B7A),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(listOf(Color(0x99FF5B7A), Color(0x99FFB36B)))
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = errorMessage,
-                                color = Color.White,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                text = "Dismiss",
-                                color = Color.White.copy(alpha = 0.92f),
-                                modifier = Modifier.padding(start = 12.dp).clickable { onDismissError() }
-                            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = screenInset, bottom = screenInset)
+                .pointerInput(uiState.nowPlaying) {}
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { delta ->
+                        if (!isEdgeDrag || backTriggered) return@rememberDraggableState
+                        dragSum += delta
+                        if (dragSum <= -triggerPx) {
+                            backTriggered = true
+                            onBack()
                         }
+                    },
+                    onDragStarted = { startOffset ->
+                        dragSum = 0f
+                        backTriggered = false
+
+                        val fromRight = startOffset.x >= (screenWidthPx - edgePx)
+                        isEdgeDrag = fromRight
+                    },
+                    onDragStopped = {
+                        isEdgeDrag = false
+                        dragSum = 0f
+                        backTriggered = false
+                    }
+                )
+        ) {
+            Scaffold(
+                containerColor = design.colors.transparent,
+                topBar = {
+                    NeonTopBar(
+                        title = uiState.nowPlaying?.name.orEmpty(),
+                        showBack = true,
+                        onBack = onBack
+                    )
+                }
+            ) { padding ->
+                Column(
+                    Modifier
+                        .padding(padding)
+                        .padding(design.sizes.screenContentPadding)
+                        .navigationBarsPadding()
+                        .fillMaxSize()
+                ) {
+
+                    if (uiState.nowPlaying == null) {
+                        LaunchedEffect(uiState.nowPlaying) { onBack() }
+                        return@Column
                     }
 
-                    Spacer(Modifier.height(12.dp))
-                }
+                    uiState.errorMessage?.let { errorMessage ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(design.shapes.cardCorner),
+                            color = design.colors.errorSurface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                design.brushes.errorBorder
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = design.sizes.sectionSpacingMedium,
+                                        vertical = design.sizes.sectionSpacingSmall
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = errorMessage,
+                                    color = design.colors.textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "Dismiss",
+                                    color = design.colors.textPrimary.copy(alpha = 0.92f),
+                                    modifier = Modifier
+                                        .padding(start = design.sizes.sectionSpacingSmall)
+                                        .clickable { onDismissError() }
+                                )
+                            }
+                        }
 
-                val timeBrush = Brush.linearGradient(
-                    listOf(
-                        Color(0xFF85EEFF), // cyan
-                        Color(0xFF9EFFD3), // green
-                        Color(0xFFDECBFF)  // purple
-                    )
-                )
+                        Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
+                    }
 
-                Row(Modifier.fillMaxWidth()) {
+                    val timeBrush = design.brushes.timeText
 
-                    Text(
-                        text = formatMs(seekPreviewMs),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            brush = timeBrush,
-                            fontWeight = FontWeight.SemiBold,
-                            shadow = Shadow(
-                                color = Color(0x552EE6FF),
-                                offset = Offset(0f, 0f),
-                                blurRadius = 12f
+                    Row(Modifier.fillMaxWidth()) {
+
+                        Text(
+                            text = formatMs(seekPreviewMs),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                brush = timeBrush,
+                                fontWeight = FontWeight.SemiBold,
+                                shadow = Shadow(
+                                    color = design.colors.errorGlow,
+                                    offset = Offset(0f, 0f),
+                                    blurRadius = 12f
+                                )
                             )
                         )
-                    )
 
-                    Spacer(Modifier.weight(1f))
+                        Spacer(Modifier.weight(1f))
 
-                    Text(
-                        text = formatRemainingMs(seekPreviewMs, uiState.durationMs),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            brush = timeBrush,
-                            fontWeight = FontWeight.SemiBold,
-                            shadow = Shadow(
-                                color = Color(0x552EE6FF),
-                                offset = Offset(0f, 0f),
-                                blurRadius = 12f
+                        Text(
+                            text = formatRemainingMs(seekPreviewMs, uiState.durationMs),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                brush = timeBrush,
+                                fontWeight = FontWeight.SemiBold,
+                                shadow = Shadow(
+                                    color = design.colors.errorGlow,
+                                    offset = Offset(0f, 0f),
+                                    blurRadius = 12f
+                                )
                             )
                         )
-                    )
-                }
+                    }
 
-                Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
 
-                ArcSeekBar(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    progress = sliderValue,
-                    onProgressChange = { p ->
-                        isUserSeeking = true
-                        seekPreviewMs = (p * safeDuration).toLong()
-                    },
-                    onProgressChangeFinished = {
-                        actions.seekTo(seekPreviewMs)
-                        isUserSeeking = false
-                    },
-                    onCenterClick = actions.playPause,
-                    gapDegrees = 70f,
-                    startAngleDegrees = 125f,
-                    strokeWidth = 10.dp,
-                    centerContent = {
+                    ArcSeekBar(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = design.sizes.sectionSpacingSmall),
+                        progress = sliderValue,
+                        onProgressChange = { p ->
+                            isUserSeeking = true
+                            seekPreviewMs = (p * safeDuration).toLong()
+                        },
+                        onProgressChangeFinished = {
+                            actions.seekTo(seekPreviewMs)
+                            isUserSeeking = false
+                        },
+                        onCenterClick = actions.playPause,
+                        gapDegrees = 70f,
+                        startAngleDegrees = 125f,
+                        strokeWidth = design.sizes.seekBarStroke,
+                        centerContent = {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(Color(0x14000000))
+                                .background(design.colors.centerOverlay)
                                 .border(
                                     width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.10f),
+                                    color = design.colors.whiteOverlay,
                                     shape = CircleShape
                                 ),
                             contentAlignment = Alignment.Center
@@ -262,66 +276,68 @@ fun PlayerScreen(
                             // Image(…)
                             Text(
                                 text = "♪",
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = Color.White.copy(alpha = 0.55f)
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontSize = design.text.playerCenterGlyph.fontSize
+                                ),
+                                color = design.colors.textPrimary.copy(alpha = 0.55f)
                             )
                         }
-                    }
-                )
+                        }
+                    )
 
-                Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(design.sizes.sectionSpacingLarge))
 
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        GhostIconButton(
-                            label = "⟲",
-                            onClick = { actions.seekBy(-10_000) }
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            GhostIconButton(
+                                label = "⟲",
+                                onClick = { actions.seekBy(-10_000) }
+                            )
 
-                        Spacer(Modifier.width(18.dp))
+                            Spacer(Modifier.width(design.sizes.sectionSpacingLarge))
 
-                        // Play/Pause
-                        GlassIconButton(
-                            label = if (uiState.isPlaying) "Ⅱ" else "▶",
-                            onClick = actions.playPause,
-                            size = 84.dp,
-                            modifier = Modifier,
-                            isActive = uiState.isPlaying
-                        )
+                            GlassIconButton(
+                                label = if (uiState.isPlaying) "Ⅱ" else "▶",
+                                onClick = actions.playPause,
+                                size = design.sizes.playerPrimaryButton,
+                                modifier = Modifier,
+                                isActive = uiState.isPlaying
+                            )
 
-                        Spacer(Modifier.width(18.dp))
+                            Spacer(Modifier.width(design.sizes.sectionSpacingLarge))
 
-                        GhostIconButton(
-                            label = "⟳",
-                            onClick = { actions.seekBy(10_000) }
-                        )
-                    }
+                            GhostIconButton(
+                                label = "⟳",
+                                onClick = { actions.seekBy(10_000) }
+                            )
+                        }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        GlassIconButton(
-                            label = "■",
-                            onClick = actions.stop,
-                            size = 72.dp,
-                            isActive = false
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            GlassIconButton(
+                                label = "■",
+                                onClick = actions.stop,
+                                size = design.sizes.playerSecondaryButton,
+                                isActive = false
+                            )
 
-                        GlassIconButton(
-                            label = "∞",
-                            onClick = actions.toggleLooping,
-                            size = 72.dp,
-                            isActive = uiState.isLooping
-                        )
+                            GlassIconButton(
+                                label = "∞",
+                                onClick = actions.toggleLooping,
+                                size = design.sizes.playerSecondaryButton,
+                                isActive = uiState.isLooping
+                            )
+                        }
                     }
                 }
             }
@@ -336,23 +352,18 @@ private fun GlassButton(
     modifier: Modifier = Modifier,
     height: Dp = 46.dp
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val design = JGSTheme.design
+    val shape = RoundedCornerShape(design.shapes.smallButtonCorner)
 
     Surface(
         modifier = modifier.height(height),
         shape = shape,
-        color = Color(0x14FFFFFF),
+        color = design.colors.glassSurface,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            Brush.linearGradient(
-                listOf(
-                    Color(0x332EE6FF),
-                    Color(0x3332FFA7),
-                    Color(0x339E6BFF)
-                )
-            )
+            design.brushes.controlInactiveBorder
         ),
         onClick = onClick
     ) {
@@ -364,9 +375,11 @@ private fun GlassButton(
         ) {
             Text(
                 text = text,
-                color = Color.White.copy(alpha = 0.88f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
+                color = design.colors.textPrimary.copy(alpha = 0.88f),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = design.text.buttonLabel.fontSize,
+                    fontWeight = FontWeight.SemiBold
+                )
             )
         }
     }
@@ -380,23 +393,8 @@ private fun GlassIconButton(
     size: Dp = 56.dp,
     isActive: Boolean = false
 ) {
-    val shape = RoundedCornerShape(18.dp)
-
-    val activeFill = Brush.linearGradient(
-        listOf(
-            Color(0x332EE6FF),
-            Color(0x2232FFA7),
-            Color(0x229E6BFF)
-        )
-    )
-
-    val borderBrush = Brush.linearGradient(
-        listOf(
-            Color(0x662EE6FF),
-            Color(0x6632FFA7),
-            Color(0x669E6BFF)
-        )
-    )
+    val design = JGSTheme.design
+    val shape = RoundedCornerShape(design.shapes.largeButtonCorner)
 
     // ----- PULSE -----
     val transition = rememberInfiniteTransition(label = "glowPulse")
@@ -433,13 +431,7 @@ private fun GlassIconButton(
                     }
                     .clip(shape)
                     .background(
-                        Brush.linearGradient(
-                            listOf(
-                                Color(0x1A2EE6FF),
-                                Color(0x1232FFA7),
-                                Color(0x129E6BFF)
-                            )
-                        )
+                        design.brushes.controlActiveGlow
                     )
             )
         }
@@ -447,32 +439,32 @@ private fun GlassIconButton(
         Surface(
             modifier = Modifier.size(size),
             shape = shape,
-            color = Color(0x12FFFFFF),
+            color = design.colors.glassSurface,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             border = androidx.compose.foundation.BorderStroke(
                 1.dp,
-                if (isActive) borderBrush else Brush.linearGradient(
-                    listOf(
-                        Color(0x332EE6FF),
-                        Color(0x3332FFA7),
-                        Color(0x339E6BFF)
-                    )
-                )
+                if (isActive) design.brushes.controlActiveBorder else design.brushes.controlInactiveBorder
             ),
             onClick = onClick
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(if (isActive) activeFill else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))),
+                    .background(if (isActive) design.brushes.controlActiveFill else design.brushes.transparentFill),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label,
-                    color = Color.White.copy(alpha = if (isActive) 0.98f else 0.92f),
-                    fontSize = if (size >= 80.dp) 26.sp else 18.sp,
-                    fontWeight = FontWeight.Bold
+                    color = design.colors.textPrimary.copy(alpha = if (isActive) 0.98f else 0.92f),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = if (size >= design.sizes.playerPrimaryButton) {
+                            design.text.iconButtonLarge.fontSize
+                        } else {
+                            design.text.iconButtonSmall.fontSize
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
                 )
             }
         }
@@ -486,10 +478,11 @@ private fun GhostIconButton(
     modifier: Modifier = Modifier,
     size: Dp = 56.dp
 ) {
+    val design = JGSTheme.design
     Surface(
         modifier = modifier.size(size),
         shape = CircleShape,
-        color = Color.Transparent,
+        color = design.colors.transparent,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         onClick = onClick
@@ -497,9 +490,11 @@ private fun GhostIconButton(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 text = label,
-                color = Color.White.copy(alpha = 0.90f),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold
+                color = design.colors.textPrimary.copy(alpha = 0.90f),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = design.text.iconButtonMedium.fontSize,
+                    fontWeight = FontWeight.SemiBold
+                )
             )
         }
     }

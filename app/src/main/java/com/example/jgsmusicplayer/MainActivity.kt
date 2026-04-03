@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +52,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -68,23 +72,46 @@ import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.screens.PlayerScreen
+import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
+import com.example.jgsmusicplayer.ui.theme.JGSMusicPlayerTheme
+import com.example.jgsmusicplayer.ui.theme.JGSTheme
+import com.example.jgsmusicplayer.ui.theme.JGSThemedBackground
+import com.example.jgsmusicplayer.ui.theme.rememberJGSThemeController
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
         setContent {
-            MaterialTheme {
-                App(viewModel = viewModel)
-            }
+            AppRoot(viewModel = viewModel)
         }
     }
 }
 
 @Composable
-private fun App(viewModel: MainViewModel) {
+private fun AppRoot(viewModel: MainViewModel) {
+    val themeController = rememberJGSThemeController()
+
+    JGSMusicPlayerTheme(themeSpec = themeController.currentTheme) {
+        App(
+            viewModel = viewModel,
+            currentThemeButtonLabel = themeController.currentButtonLabel,
+            onCycleTheme = themeController.cycleTheme
+        )
+    }
+}
+
+@Composable
+private fun App(
+    viewModel: MainViewModel,
+    currentThemeButtonLabel: String,
+    onCycleTheme: () -> Unit
+) {
     val context = LocalContext.current
     val navController = rememberNavController()
     val uiState = viewModel.uiState
@@ -152,24 +179,41 @@ private fun App(viewModel: MainViewModel) {
         )
     }
 
-    NavHost(navController = navController, startDestination = "library") {
-        composable("library") {
-            Mp3BrowserAndPlayer(
-                uiState = uiState,
-                files = files,
-                hasPermission = hasPermission,
-                onRequestPermission = { permissionLauncher.launch(audioPermission) },
-                onRefreshFiles = viewModel::refreshAudioFiles,
-                onDismissError = viewModel::clearPlaybackError,
-                actions = actions
-            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(navController = navController, startDestination = "library") {
+            composable("library") {
+                Mp3BrowserAndPlayer(
+                    uiState = uiState,
+                    files = files,
+                    hasPermission = hasPermission,
+                    onRequestPermission = { permissionLauncher.launch(audioPermission) },
+                    onRefreshFiles = viewModel::refreshAudioFiles,
+                    onDismissError = viewModel::clearPlaybackError,
+                    actions = actions
+                )
+            }
+            composable("player") {
+                PlayerScreen(
+                    onBack = returnToLibrary,
+                    uiState = uiState,
+                    onDismissError = viewModel::clearPlaybackError,
+                    actions = actions
+                )
+            }
         }
-        composable("player") {
-            PlayerScreen(
-                onBack = returnToLibrary,
-                uiState = uiState,
-                onDismissError = viewModel::clearPlaybackError,
-                actions = actions
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(
+                    start = JGSTheme.design.sizes.screenContentPadding,
+                    bottom = JGSTheme.design.sizes.sectionSpacingSmall
+                )
+        ) {
+            BottomGlassActionButton(
+                text = currentThemeButtonLabel,
+                onClick = onCycleTheme
             )
         }
     }
@@ -186,10 +230,11 @@ private fun Mp3BrowserAndPlayer(
     actions: PlayerActions
 ) {
     var selectedFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    var globalQuery by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val libraryListState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
-    val folderScrollSnapshotsState = rememberSaveable(stateSaver = FolderScrollSnapshotsSaver) {
+    val folderScrollSnapshotsState = rememberSaveable(saver = FolderScrollSnapshotsStateSaver) {
         mutableStateOf(emptyMap<String, Pair<Int, Int>>())
     }
     val folderScrollSnapshots = folderScrollSnapshotsState.value
@@ -205,32 +250,35 @@ private fun Mp3BrowserAndPlayer(
     }
 
     val folders = remember(files) { files.groupBy { it.folder }.toSortedMap() }
+    val design = JGSTheme.design
 
     val density = LocalDensity.current
     val cfg = LocalConfiguration.current
     val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
-    val edgePx = with(density) { 28.dp.toPx() }
-    val triggerPx = with(density) { 72.dp.toPx() }
+    val edgePx = with(density) { design.sizes.edgeSwipeZone.toPx() }
+    val triggerPx = with(density) { design.sizes.edgeSwipeTrigger.toPx() }
 
     var dragSum by remember { mutableStateOf(0f) }
     var backTriggered by remember { mutableStateOf(false) }
     var isEdgeDrag by remember { mutableStateOf(false) }
-
-    val seaBorder = Brush.linearGradient(
-        listOf(
-            Color(0x662EE6FF),
-            Color(0x6632FFA7),
-            Color(0x669E6BFF)
+    val seaBorder = design.brushes.primaryBorder
+    val glassBg = design.colors.glassSurface
+    val textPrimary = design.colors.textPrimary
+    val textSecondary = design.colors.textSecondary
+    val listTextShadowColor = design.colors.listTextShadow
+    val listTextShadow = if (listTextShadowColor.alpha > 0f) {
+        Shadow(
+            color = listTextShadowColor,
+            offset = Offset(0f, 0f),
+            blurRadius = with(density) { 3.dp.toPx() }
         )
-    )
-    val glassBg = Color(0x12FFFFFF)
-    val textPrimary = Color.White.copy(alpha = 0.92f)
-    val textSecondary = Color.White.copy(alpha = 0.65f)
+    } else {
+        null
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(com.example.jgsmusicplayer.ui.theme.PlayerBg)
             .pointerInput(selectedFolder) {}
             .draggable(
                 orientation = Orientation.Horizontal,
@@ -257,8 +305,13 @@ private fun Mp3BrowserAndPlayer(
                 }
             )
     ) {
+        JGSThemedBackground(
+            target = JGSBackgroundTarget.LIBRARY,
+            modifier = Modifier.fillMaxSize()
+        )
+
         Scaffold(
-            containerColor = Color.Transparent,
+            containerColor = design.colors.transparent,
             topBar = {
                 NeonTopBar(
                     title = selectedFolder ?: "JGS Music Player",
@@ -266,35 +319,23 @@ private fun Mp3BrowserAndPlayer(
                     onBack = { backFromFolder() }
                 )
             },
-            floatingActionButton = {
-                if (uiState.nowPlaying != null) {
-                    val fabBg = Brush.linearGradient(
-                        listOf(
-                            Color(0xCC121826),
-                            Color(0xCC0D111A)
+            bottomBar = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(
+                            horizontal = design.sizes.screenContentPadding,
+                            vertical = design.sizes.sectionSpacingSmall
+                        ),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (uiState.nowPlaying != null) {
+                        BottomGlassActionButton(
+                            text = "Now",
+                            onClick = actions.openNow
                         )
-                    )
-
-                    Surface(
-                        onClick = actions.openNow,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(1.dp, seaBorder),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 10.dp
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .background(fabBg)
-                                .padding(horizontal = 20.dp, vertical = 14.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Now",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
                     }
                 }
             }
@@ -302,15 +343,19 @@ private fun Mp3BrowserAndPlayer(
             Column(
                 Modifier
                     .padding(padding)
-                    .padding(16.dp)
+                    .padding(design.sizes.screenContentPadding)
                     .fillMaxSize()
             ) {
                 if (!hasPermission) {
-                    Text("No permission to access the audio", color = textSecondary)
-                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "No permission to access the audio",
+                        color = textSecondary,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
                     Surface(
                         onClick = onRequestPermission,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner - 2.dp),
                         color = glassBg,
                         border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
@@ -318,8 +363,12 @@ private fun Mp3BrowserAndPlayer(
                     ) {
                         Text(
                             "Allow",
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            color = textPrimary
+                            modifier = Modifier.padding(
+                                horizontal = design.sizes.screenContentPadding,
+                                vertical = design.sizes.sectionSpacingSmall
+                            ),
+                            color = textPrimary,
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                     return@Column
@@ -328,11 +377,11 @@ private fun Mp3BrowserAndPlayer(
                 uiState.errorMessage?.let { errorMessage ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-                        color = Color(0x22FF5B7A),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+                        color = design.colors.errorSurface,
                         border = BorderStroke(
                             1.dp,
-                            Brush.linearGradient(listOf(Color(0x99FF5B7A), Color(0x99FFB36B)))
+                            design.brushes.errorBorder
                         ),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
@@ -345,25 +394,31 @@ private fun Mp3BrowserAndPlayer(
                         ) {
                             Text(
                                 text = errorMessage,
-                                color = Color.White,
-                                modifier = Modifier.weight(1f)
+                                color = textPrimary,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium
                             )
                             Text(
                                 text = "Dismiss",
                                 color = textPrimary,
-                                modifier = Modifier.clickable { onDismissError() }
+                                modifier = Modifier.clickable { onDismissError() },
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
                 }
 
                 if (files.isEmpty()) {
-                    Text("MP3 not found", color = textSecondary)
-                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "MP3 not found",
+                        color = textSecondary,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
                     Surface(
                         onClick = onRefreshFiles,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner - 2.dp),
                         color = glassBg,
                         border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
@@ -371,8 +426,12 @@ private fun Mp3BrowserAndPlayer(
                     ) {
                         Text(
                             "Refresh",
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            color = textPrimary
+                            modifier = Modifier.padding(
+                                horizontal = design.sizes.screenContentPadding,
+                                vertical = design.sizes.sectionSpacingSmall
+                            ),
+                            color = textPrimary,
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                     return@Column
@@ -381,9 +440,8 @@ private fun Mp3BrowserAndPlayer(
                 if (uiState.nowPlaying != null) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
                         color = glassBg,
-                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
@@ -395,14 +453,16 @@ private fun Mp3BrowserAndPlayer(
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Text("Playing:", color = textSecondary, style = MaterialTheme.typography.labelMedium)
+                                Spacer(Modifier.height(4.dp))
                                 Text(
                                     uiState.nowPlaying.name,
                                     color = textPrimary,
-                                    modifier = Modifier.clickable { actions.openNow() }
+                                    modifier = Modifier.clickable { actions.openNow() },
+                                    style = MaterialTheme.typography.bodyLarge
                                 )
                             }
 
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(design.sizes.sectionSpacingSmall))
 
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -417,48 +477,146 @@ private fun Mp3BrowserAndPlayer(
                                 SmallGlassIconButton(
                                     label = "■",
                                     onClick = actions.stop,
-                                    border = Brush.linearGradient(listOf(Color(0x66FF5B7A), Color(0x66FFB36B)))
+                                    border = design.brushes.stopBorder
                                 )
                             }
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
                 }
 
                 if (selectedFolder == null) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+                        color = glassBg,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp
+                    ) {
+                        SearchField(
+                            value = globalQuery,
+                            onValueChange = { globalQuery = it },
+                            label = "Search all tracks",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = design.sizes.screenContentPadding,
+                                    vertical = design.sizes.sectionSpacingSmall
+                                ),
+                            textColor = textPrimary,
+                            labelColor = textSecondary,
+                            cursorColor = design.colors.seekKnob,
+                            onDone = { focusManager.clearFocus() }
+                        )
+                    }
+
+                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
+
+                    val globalResults = remember(files, globalQuery) {
+                        if (globalQuery.isBlank()) {
+                            emptyList()
+                        } else {
+                            files.filter { file ->
+                                file.name.contains(globalQuery, ignoreCase = true) ||
+                                    file.folder.contains(globalQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
+                    if (globalQuery.isNotBlank() && globalResults.isEmpty()) {
+                        Text(
+                            "Nothing found",
+                            color = textSecondary,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
                     LazyColumn(
                         state = libraryListState,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        val keys = folders.keys.toList()
-                        items(keys.size) { index ->
-                            val folder = keys[index]
+                        if (globalQuery.isBlank()) {
+                            val keys = folders.keys.toList()
+                            items(keys.size) { index ->
+                                val folder = keys[index]
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selectedFolder = folder
-                                        query = ""
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedFolder = folder
+                                            query = ""
+                                        }
+                                        .padding(
+                                            vertical = design.sizes.listItemVerticalPadding,
+                                            horizontal = design.sizes.listItemHorizontalPadding
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            folder.ifBlank { "/" },
+                                            color = textPrimary,
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                shadow = listTextShadow
+                                            )
+                                        )
+                                        Text(
+                                            "${folders[folder]?.size ?: 0} file(s)",
+                                            color = textSecondary,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                shadow = listTextShadow
+                                            )
+                                        )
                                     }
-                                    .padding(vertical = 12.dp, horizontal = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(folder.ifBlank { "/" }, color = textPrimary)
-                                    Text(
-                                        "${folders[folder]?.size ?: 0} file(s)",
-                                        color = textSecondary,
-                                        style = MaterialTheme.typography.labelMedium
+                                }
+
+                                if (index != keys.lastIndex) {
+                                    SeaDivider(
+                                        modifier = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
+                                        brush = seaBorder
                                     )
                                 }
                             }
+                        } else {
+                            items(globalResults.size) { index ->
+                                val file = globalResults[index]
 
-                            if (index != keys.lastIndex) {
-                                SeaDivider(
-                                    modifier = Modifier.padding(horizontal = 6.dp),
-                                    brush = seaBorder
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { actions.playTrack(file) }
+                                        .padding(
+                                            vertical = design.sizes.listItemVerticalPadding,
+                                            horizontal = design.sizes.listItemHorizontalPadding
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            file.name,
+                                            color = textPrimary,
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                shadow = listTextShadow
+                                            )
+                                        )
+                                        Text(
+                                            file.folder.ifBlank { "/" },
+                                            color = textSecondary,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                shadow = listTextShadow
+                                            )
+                                        )
+                                    }
+                                }
+
+                                if (index != globalResults.lastIndex) {
+                                    SeaDivider(
+                                        modifier = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
+                                        brush = seaBorder
+                                    )
+                                }
                             }
                         }
                     }
@@ -477,39 +635,29 @@ private fun Mp3BrowserAndPlayer(
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
                         color = glassBg,
-                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
-                        OutlinedTextField(
+                        SearchField(
                             value = query,
                             onValueChange = { query = it },
-                            label = { Text("Search", color = textSecondary) },
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                                onDone = { focusManager.clearFocus() }
-                            ),
+                            label = "Search",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(10.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = textPrimary,
-                                unfocusedTextColor = textPrimary,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                cursorColor = Color(0xFF2EE6FF),
-                                focusedLabelColor = textSecondary,
-                                unfocusedLabelColor = textSecondary
-                            )
+                                .padding(
+                                    horizontal = design.sizes.screenContentPadding,
+                                    vertical = design.sizes.sectionSpacingSmall
+                                ),
+                            textColor = textPrimary,
+                            labelColor = textSecondary,
+                            cursorColor = design.colors.seekKnob,
+                            onDone = { focusManager.clearFocus() }
                         )
                     }
 
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
 
                     val list = folders[selectedFolder] ?: emptyList()
                     val filtered = remember(list, query) {
@@ -517,7 +665,12 @@ private fun Mp3BrowserAndPlayer(
                     }
 
                     if (filtered.isEmpty()) {
-                        Text("Nothing found", color = textSecondary, modifier = Modifier.padding(horizontal = 4.dp))
+                        Text(
+                            "Nothing found",
+                            color = textSecondary,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
 
                     DisposableEffect(currentFolder, folderListState) {
@@ -542,19 +695,25 @@ private fun Mp3BrowserAndPlayer(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { actions.playTrack(file) }
-                                    .padding(vertical = 12.dp, horizontal = 6.dp),
+                                    .padding(
+                                        vertical = design.sizes.listItemVerticalPadding,
+                                        horizontal = design.sizes.listItemHorizontalPadding
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     file.name,
                                     color = textPrimary,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        shadow = listTextShadow
+                                    )
                                 )
                             }
 
                             if (index != filtered.lastIndex) {
                                 SeaDivider(
-                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                    modifier = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
                                     brush = seaBorder
                                 )
                             }
@@ -567,16 +726,71 @@ private fun Mp3BrowserAndPlayer(
 }
 
 @Composable
+private fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    textColor: Color,
+    labelColor: Color,
+    cursorColor: Color,
+    onDone: () -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
+            Text(
+                text = label,
+                color = labelColor,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        leadingIcon = {
+            Text(
+                text = "⌕",
+                color = labelColor,
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        textStyle = MaterialTheme.typography.bodyLarge,
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            imeAction = ImeAction.Done
+        ),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+            onDone = { onDone() }
+        ),
+        modifier = modifier.height(56.dp),
+        minLines = 1,
+        maxLines = 1,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = textColor,
+            unfocusedTextColor = textColor,
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            focusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            cursorColor = cursorColor,
+            focusedPlaceholderColor = labelColor,
+            unfocusedPlaceholderColor = labelColor
+        )
+    )
+}
+
+@Composable
 private fun SmallGlassIconButton(
     label: String,
     onClick: () -> Unit,
     border: Brush,
     size: Dp = 44.dp
 ) {
+    val design = JGSTheme.design
     Surface(
         onClick = onClick,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-        color = Color(0x1AFFFFFF),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.smallButtonCorner),
+        color = design.colors.glassSurface,
         border = BorderStroke(1.dp, border),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
@@ -585,7 +799,40 @@ private fun SmallGlassIconButton(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 text = label,
-                color = Color.White.copy(alpha = 0.95f),
+                color = design.colors.textPrimary.copy(alpha = 0.95f),
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomGlassActionButton(
+    text: String,
+    onClick: () -> Unit
+) {
+    val design = JGSTheme.design
+
+    Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.fabCorner),
+        color = design.colors.transparent,
+        border = BorderStroke(1.dp, design.brushes.primaryBorder),
+        tonalElevation = 0.dp,
+        shadowElevation = 10.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .background(design.brushes.fabBackground)
+                .padding(
+                    horizontal = design.sizes.floatingNowHorizontalPadding,
+                    vertical = design.sizes.floatingNowVerticalPadding
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                color = design.colors.textOnAccent,
                 style = MaterialTheme.typography.titleMedium
             )
         }
@@ -629,3 +876,22 @@ private val FolderScrollSnapshotsSaver = listSaver<Map<String, Pair<Int, Int>>, 
         }
     }
 )
+
+private val FolderScrollSnapshotsStateSaver =
+    listSaver<androidx.compose.runtime.MutableState<Map<String, Pair<Int, Int>>>, String>(
+        save = { snapshotsState ->
+            snapshotsState.value.entries.flatMap { (folder, position) ->
+                listOf(folder, position.first.toString(), position.second.toString())
+            }
+        },
+        restore = { restored ->
+            mutableStateOf(
+                restored.chunked(3).associate { chunk ->
+                    val folder = chunk[0]
+                    val index = chunk[1].toIntOrNull() ?: 0
+                    val offset = chunk[2].toIntOrNull() ?: 0
+                    folder to (index to offset)
+                }
+            )
+        }
+    )

@@ -1,16 +1,12 @@
 package com.example.jgsmusicplayer.ui.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -25,8 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.Dp
+
+import com.example.jgsmusicplayer.ui.theme.JGSTheme
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -35,36 +32,47 @@ fun NeonTopBar(
     showBack: Boolean,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    height: Dp = 64.dp,
-    sidePadding: Dp = 10.dp,
-    backSize: Dp = 52.dp,
-    backOffsetY: Dp = (-5).dp,
-    endPadding: Dp = 10.dp,
-    titleHorizontalPadding: Dp = 12.dp
+    height: Dp? = null,
+    sidePadding: Dp? = null,
+    backSize: Dp? = null,
+    backOffsetY: Dp? = null,
+    endPadding: Dp? = null,
+    titleHorizontalPadding: Dp? = null
 ) {
+    val design = JGSTheme.design
+    val resolvedHeight = height ?: design.sizes.topBarHeight
+    val resolvedSidePadding = sidePadding ?: design.sizes.topBarSidePadding
+    val resolvedBackSize = backSize ?: design.sizes.topBarBackSize
+    val resolvedBackOffsetY = backOffsetY ?: design.sizes.topBarBackOffsetY
+    val resolvedEndPadding = endPadding ?: design.sizes.topBarEndPadding
+    val resolvedTitleHorizontalPadding =
+        titleHorizontalPadding ?: design.sizes.topBarTitleHorizontalPadding
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(height),
+            .statusBarsPadding()
+            .padding(top = design.sizes.sectionSpacingSmall)
+            .height(resolvedHeight),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (showBack) {
             Box(
                 modifier = Modifier
-                    .padding(start = sidePadding)
-                    .size(backSize)
+                    .padding(start = resolvedSidePadding)
+                    .size(resolvedBackSize)
                     .clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "←",
-                    modifier = Modifier.offset(y = backOffsetY),
-                    color = Color.White.copy(alpha = 0.96f),
-                    fontSize = 30.sp,
+                    modifier = Modifier.offset(y = resolvedBackOffsetY),
+                    color = design.colors.topBarBackIcon,
+                    fontSize = design.text.topBarBack.fontSize,
                     fontWeight = FontWeight.Black,
                     style = TextStyle(
                         shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.35f),
+                            color = design.colors.topBarBackShadow,
                             offset = Offset(0f, 2f),
                             blurRadius = 8f
                         )
@@ -72,43 +80,20 @@ fun NeonTopBar(
                 )
             }
         } else {
-            Spacer(Modifier.width(backSize + sidePadding))
+            Spacer(Modifier.width(resolvedBackSize + resolvedSidePadding))
         }
-
-        val transition = rememberInfiniteTransition(label = "neonTopBarTitle")
-        val t by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2600),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "neonTopBarTitleT"
-        )
-
-        val brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF80EBFF),
-                Color(0xFF9CFFD4),
-                Color(0xFFA7D8FF),
-                Color(0xFF97EFFF)
-            ),
-            start = Offset(0f + 260f * t, 0f),
-            end = Offset(900f - 260f * t, 0f)
-        )
-        // ----------------------------------------
 
         Box(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = endPadding),
+                .padding(end = resolvedEndPadding),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = titleHorizontalPadding)
+                    .padding(horizontal = resolvedTitleHorizontalPadding)
                     .clipToBounds()
                     .basicMarquee(
                         iterations = Int.MAX_VALUE,
@@ -120,15 +105,15 @@ fun NeonTopBar(
                 softWrap = false,
                 overflow = TextOverflow.Clip,
                 style = MaterialTheme.typography.titleLarge.copy(
-                    brush = brush,
+                    brush = design.brushes.topBarTitle,
                     fontWeight = FontWeight.Bold,
                     shadow = Shadow(
-                        color = Color(0x662EE6FF),
+                        color = design.colors.topBarTitleGlow,
                         offset = Offset(0f, 0f),
                         blurRadius = 12f
                     )
                 ),
-                fontSize = 20.sp
+                fontSize = design.text.topBarTitle.fontSize
             )
         }
     }
