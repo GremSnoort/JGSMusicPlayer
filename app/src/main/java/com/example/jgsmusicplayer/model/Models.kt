@@ -17,13 +17,18 @@ data class VideoFile(
 data class PlayerUiState(
     val nowPlaying: AudioFile? = null,
     val isPlaying: Boolean = false,
+    val isLooping: Boolean = false,
     val durationMs: Long = 0L,
-    val positionMs: Long = 0L
+    val positionMs: Long = 0L,
+    val errorMessage: String? = null
 )
 
 data class PlayerActions(
     val openNow: () -> Unit,
     val playPause: () -> Unit,
     val stop: () -> Unit,
-    val playTrack: (AudioFile) -> Unit
+    val playTrack: (AudioFile) -> Unit,
+    val seekTo: (Long) -> Unit,
+    val seekBy: (Long) -> Unit,
+    val toggleLooping: () -> Unit
 )

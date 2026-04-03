@@ -2,221 +2,197 @@ package com.example.jgsmusicplayer
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.viewModels
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.core.content.ContextCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.delay
 
+import com.example.jgsmusicplayer.model.AudioFile
 import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
-import com.example.jgsmusicplayer.model.AudioFile
-import com.example.jgsmusicplayer.data.queryAudio
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.screens.PlayerScreen
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                App()
+                App(viewModel = viewModel)
             }
         }
     }
 }
 
 @Composable
-private fun App() {
+private fun App(viewModel: MainViewModel) {
     val context = LocalContext.current
     val navController = rememberNavController()
-    var uiState by remember { mutableStateOf(PlayerUiState()) }
-    val latestUiState by rememberUpdatedState(uiState)
+    val uiState = viewModel.uiState
+    val files = viewModel.files
+    val audioPermission = remember { requiredAudioPermission() }
 
-    val player = remember { ExoPlayer.Builder(context).build() }
-    val actions = PlayerActions(
-        openNow = { navController.navigate("player") { launchSingleTop = true } },
-
-        playPause = {
-            val curTrack = latestUiState.nowPlaying ?: return@PlayerActions
-
-            when {
-                player.playbackState == Player.STATE_ENDED -> {
-                    player.seekTo(0)
-                    player.play()
-                    return@PlayerActions
-                }
-
-                player.mediaItemCount == 0 -> {
-                    player.setMediaItem(MediaItem.fromUri(curTrack.uri))
-                    player.prepare()
-                    player.play()
-                    return@PlayerActions
-                }
-
-                latestUiState.isPlaying -> player.pause()
-                else -> player.play()
-            }
-        },
-
-        stop = {
-            player.stop()
-            player.clearMediaItems()
-            uiState = latestUiState.copy(
-                nowPlaying = null,
-                isPlaying = false,
-                durationMs = 0L,
-                positionMs = 0L
-            )
-        },
-
-        playTrack = { f ->
-            player.stop()
-            player.clearMediaItems()
-            player.setMediaItem(MediaItem.fromUri(f.uri))
-            player.prepare()
-            player.play()
-            uiState = latestUiState.copy(nowPlaying = f, isPlaying = true)
-            navController.navigate("player") { launchSingleTop = true }
-        }
-    )
-
-    LaunchedEffect(player) {
-        while (true) {
-            val d = player.duration
-            val p = player.currentPosition
-
-            val newDuration = if (d > 0) d else 0L
-            val newPosition = if (p > 0) p else 0L
-
-            val cur = latestUiState
-            if (cur.durationMs != newDuration || cur.positionMs != newPosition) {
-                uiState = cur.copy(durationMs = newDuration, positionMs = newPosition)
-            }
-
-            delay(250)
-        }
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, audioPermission) == PackageManager.PERMISSION_GRANTED
+        )
     }
-
-    DisposableEffect(player) {
-        onDispose {
-            player.release()
-        }
-    }
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                uiState = latestUiState.copy(isPlaying = playing)
-            }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED) {
-                    player.pause()
-                    player.seekTo(0)
-
-                    uiState = latestUiState.copy(
-                        isPlaying = false,
-                        positionMs = 0L,
-                        durationMs = (player.duration.takeIf { it > 0 } ?: latestUiState.durationMs)
-                    )
-                }
-            }
-        }
-
-        player.addListener(listener)
-        onDispose { player.removeListener(listener) }
-    }
-
-    NavHost(navController = navController, startDestination = "library") {
-        composable("library") {
-            Mp3BrowserAndPlayer(
-                navController = navController,
-                player = player,
-                uiState = latestUiState,
-                actions = actions
-            )
-        }
-        composable("player") {
-            PlayerScreen(
-                onBack = { navController.popBackStack() },
-                player = player,
-                uiState = latestUiState,
-                actions = actions
-            )
-        }
-    }
-}
-
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun Mp3BrowserAndPlayer(
-    navController: androidx.navigation.NavHostController,
-    player: ExoPlayer,
-    uiState: PlayerUiState,
-    actions: PlayerActions
-) {
-    val context = LocalContext.current
-
-    var hasPermission by remember { mutableStateOf(false) }
-    var files by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
-    var selectedFolder by rememberSaveable { mutableStateOf<String?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasPermission = granted
-        if (granted) files = queryAudio(context)
+        if (granted) viewModel.refreshAudioFiles()
     }
 
-    LaunchedEffect(player) {
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.READ_MEDIA_AUDIO
+    LaunchedEffect(audioPermission) {
+        hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            audioPermission
         ) == PackageManager.PERMISSION_GRANTED
 
-        hasPermission = granted
-        if (granted) files = queryAudio(context)
-        else permissionLauncher.launch(Manifest.permission.READ_MEDIA_AUDIO)
+        if (hasPermission) {
+            viewModel.refreshAudioFiles()
+        } else {
+            permissionLauncher.launch(audioPermission)
+        }
     }
 
-    val folders = remember(files) { files.groupBy { it.folder }.toSortedMap() }
+    val openPlayer: () -> Unit = remember(navController) {
+        {
+            navController.navigate("player") {
+                launchSingleTop = true
+            }
+        }
+    }
 
+    val returnToLibrary: () -> Unit = remember(navController) {
+        {
+            val returned = navController.popBackStack("library", inclusive = false)
+            if (!returned) {
+                navController.navigate("library") {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
+    val actions = remember(navController, viewModel) {
+        PlayerActions(
+            openNow = openPlayer,
+            playPause = viewModel::playPause,
+            stop = viewModel::stopPlayback,
+            playTrack = { file ->
+                viewModel.playTrack(file)
+                openPlayer()
+            },
+            seekTo = viewModel::seekTo,
+            seekBy = viewModel::seekBy,
+            toggleLooping = viewModel::toggleLooping
+        )
+    }
+
+    NavHost(navController = navController, startDestination = "library") {
+        composable("library") {
+            Mp3BrowserAndPlayer(
+                uiState = uiState,
+                files = files,
+                hasPermission = hasPermission,
+                onRequestPermission = { permissionLauncher.launch(audioPermission) },
+                onRefreshFiles = viewModel::refreshAudioFiles,
+                onDismissError = viewModel::clearPlaybackError,
+                actions = actions
+            )
+        }
+        composable("player") {
+            PlayerScreen(
+                onBack = returnToLibrary,
+                uiState = uiState,
+                onDismissError = viewModel::clearPlaybackError,
+                actions = actions
+            )
+        }
+    }
+}
+
+@Composable
+private fun Mp3BrowserAndPlayer(
+    uiState: PlayerUiState,
+    files: List<AudioFile>,
+    hasPermission: Boolean,
+    onRequestPermission: () -> Unit,
+    onRefreshFiles: () -> Unit,
+    onDismissError: () -> Unit,
+    actions: PlayerActions
+) {
+    var selectedFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    val libraryListState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
+    val folderScrollSnapshotsState = rememberSaveable(stateSaver = FolderScrollSnapshotsSaver) {
+        mutableStateOf(emptyMap<String, Pair<Int, Int>>())
+    }
+    val folderScrollSnapshots = folderScrollSnapshotsState.value
 
     fun backFromFolder() {
         selectedFolder = null
@@ -224,43 +200,42 @@ private fun Mp3BrowserAndPlayer(
         focusManager.clearFocus()
     }
 
-// --- swipe from RIGHT edge to go back (только когда папка открыта) ---
+    BackHandler(enabled = selectedFolder != null) {
+        backFromFolder()
+    }
+
+    val folders = remember(files) { files.groupBy { it.folder }.toSortedMap() }
+
     val density = LocalDensity.current
     val cfg = LocalConfiguration.current
     val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
-
-    val edgePx = with(density) { 28.dp.toPx() }      // зона у правого края
-    val triggerPx = with(density) { 72.dp.toPx() }   // сколько тянуть до срабатывания
+    val edgePx = with(density) { 28.dp.toPx() }
+    val triggerPx = with(density) { 72.dp.toPx() }
 
     var dragSum by remember { mutableStateOf(0f) }
     var backTriggered by remember { mutableStateOf(false) }
     var isEdgeDrag by remember { mutableStateOf(false) }
-// ---------------------------------------------------------------
 
-    // --- стиль как у плеера ---
-    val SeaBorder = Brush.linearGradient(
+    val seaBorder = Brush.linearGradient(
         listOf(
             Color(0x662EE6FF),
             Color(0x6632FFA7),
             Color(0x669E6BFF)
         )
     )
-    val GlassBg = Color(0x12FFFFFF)
-    val TextPrimary = Color.White.copy(alpha = 0.92f)
-    val TextSecondary = Color.White.copy(alpha = 0.65f)
-    // --------------------------
+    val glassBg = Color(0x12FFFFFF)
+    val textPrimary = Color.White.copy(alpha = 0.92f)
+    val textSecondary = Color.White.copy(alpha = 0.65f)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(com.example.jgsmusicplayer.ui.theme.PlayerBg)
-            .pointerInput(selectedFolder) {} // чтобы корректно пересоздавался жест при входе/выходе из папки
+            .pointerInput(selectedFolder) {}
             .draggable(
                 orientation = Orientation.Horizontal,
                 state = rememberDraggableState { delta ->
-                    // жест активен ТОЛЬКО когда открыта папка
-                    if (selectedFolder == null) return@rememberDraggableState
-                    if (!isEdgeDrag || backTriggered) return@rememberDraggableState
+                    if (selectedFolder == null || !isEdgeDrag || backTriggered) return@rememberDraggableState
 
                     dragSum += delta
                     if (dragSum <= -triggerPx) {
@@ -273,9 +248,7 @@ private fun Mp3BrowserAndPlayer(
 
                     dragSum = 0f
                     backTriggered = false
-
-                    val fromRight = startOffset.x >= (screenWidthPx - edgePx)
-                    isEdgeDrag = fromRight
+                    isEdgeDrag = startOffset.x >= (screenWidthPx - edgePx)
                 },
                 onDragStopped = {
                     isEdgeDrag = false
@@ -288,32 +261,31 @@ private fun Mp3BrowserAndPlayer(
             containerColor = Color.Transparent,
             topBar = {
                 NeonTopBar(
-                    title = if (selectedFolder == null) "JGS Music Player" else selectedFolder.orEmpty(),
+                    title = selectedFolder ?: "JGS Music Player",
                     showBack = selectedFolder != null,
-                    onBack = { selectedFolder = null; query = "" }
+                    onBack = { backFromFolder() }
                 )
             },
             floatingActionButton = {
                 if (uiState.nowPlaying != null) {
-
-                    val FabBg = Brush.linearGradient(
+                    val fabBg = Brush.linearGradient(
                         listOf(
-                            Color(0xCC121826), // тёмный морской
+                            Color(0xCC121826),
                             Color(0xCC0D111A)
                         )
                     )
 
                     Surface(
                         onClick = actions.openNow,
-                        shape = RoundedCornerShape(18.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
                         color = Color.Transparent,
-                        border = BorderStroke(1.dp, SeaBorder),
+                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
-                        shadowElevation = 10.dp // немного глубины!
+                        shadowElevation = 10.dp
                     ) {
                         Box(
                             modifier = Modifier
-                                .background(FabBg)
+                                .background(fabBg)
                                 .padding(horizontal = 20.dp, vertical = 14.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -333,54 +305,85 @@ private fun Mp3BrowserAndPlayer(
                     .padding(16.dp)
                     .fillMaxSize()
             ) {
-
                 if (!hasPermission) {
-                    Text("No permission to access the audio", color = TextSecondary)
+                    Text("No permission to access the audio", color = textSecondary)
                     Spacer(Modifier.height(12.dp))
                     Surface(
-                        onClick = { permissionLauncher.launch(Manifest.permission.READ_MEDIA_AUDIO) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = GlassBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, SeaBorder),
+                        onClick = onRequestPermission,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        color = glassBg,
+                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
                         Text(
                             "Allow",
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            color = TextPrimary
+                            color = textPrimary
                         )
                     }
                     return@Column
                 }
 
+                uiState.errorMessage?.let { errorMessage ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        color = Color(0x22FF5B7A),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(listOf(Color(0x99FF5B7A), Color(0x99FFB36B)))
+                        ),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = errorMessage,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "Dismiss",
+                                color = textPrimary,
+                                modifier = Modifier.clickable { onDismissError() }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                }
+
                 if (files.isEmpty()) {
-                    Text("MP3 not found", color = TextSecondary)
+                    Text("MP3 not found", color = textSecondary)
                     Spacer(Modifier.height(12.dp))
                     Surface(
-                        onClick = { files = queryAudio(context) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = GlassBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, SeaBorder),
+                        onClick = onRefreshFiles,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        color = glassBg,
+                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
                         Text(
                             "Refresh",
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            color = TextPrimary
+                            color = textPrimary
                         )
                     }
                     return@Column
                 }
 
-                // "Playing"
                 if (uiState.nowPlaying != null) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = GlassBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, SeaBorder),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        color = glassBg,
+                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
@@ -391,10 +394,10 @@ private fun Mp3BrowserAndPlayer(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text("Playing:", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+                                Text("Playing:", color = textSecondary, style = MaterialTheme.typography.labelMedium)
                                 Text(
-                                    uiState.nowPlaying!!.name,
-                                    color = TextPrimary,
+                                    uiState.nowPlaying.name,
+                                    color = textPrimary,
                                     modifier = Modifier.clickable { actions.openNow() }
                                 )
                             }
@@ -408,7 +411,7 @@ private fun Mp3BrowserAndPlayer(
                                 SmallGlassIconButton(
                                     label = if (uiState.isPlaying) "Ⅱ" else "▶",
                                     onClick = actions.playPause,
-                                    border = SeaBorder
+                                    border = seaBorder
                                 )
 
                                 SmallGlassIconButton(
@@ -423,7 +426,10 @@ private fun Mp3BrowserAndPlayer(
                 }
 
                 if (selectedFolder == null) {
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = libraryListState,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         val keys = folders.keys.toList()
                         items(keys.size) { index ->
                             val folder = keys[index]
@@ -431,15 +437,18 @@ private fun Mp3BrowserAndPlayer(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { selectedFolder = folder; query = "" }
+                                    .clickable {
+                                        selectedFolder = folder
+                                        query = ""
+                                    }
                                     .padding(vertical = 12.dp, horizontal = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(folder.ifBlank { "/" }, color = TextPrimary)
+                                    Text(folder.ifBlank { "/" }, color = textPrimary)
                                     Text(
                                         "${folders[folder]?.size ?: 0} file(s)",
-                                        color = TextSecondary,
+                                        color = textSecondary,
                                         style = MaterialTheme.typography.labelMedium
                                     )
                                 }
@@ -448,70 +457,97 @@ private fun Mp3BrowserAndPlayer(
                             if (index != keys.lastIndex) {
                                 SeaDivider(
                                     modifier = Modifier.padding(horizontal = 6.dp),
-                                    brush = SeaBorder
+                                    brush = seaBorder
                                 )
                             }
                         }
                     }
                 } else {
-                    val list = folders[selectedFolder] ?: emptyList()
-                    val focusManager = LocalFocusManager.current
+                    val currentFolder = selectedFolder.orEmpty()
+                    val savedFolderScroll = folderScrollSnapshots[currentFolder]
+                    val folderListState = rememberSaveable(
+                        currentFolder,
+                        saver = LazyListState.Saver
+                    ) {
+                        LazyListState(
+                            firstVisibleItemIndex = savedFolderScroll?.first ?: 0,
+                            firstVisibleItemScrollOffset = savedFolderScroll?.second ?: 0
+                        )
+                    }
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = GlassBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, SeaBorder),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        color = glassBg,
+                        border = BorderStroke(1.dp, seaBorder),
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it },
-                            label = { Text("Search", color = TextSecondary) },
+                            label = { Text("Search", color = textSecondary) },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                                onDone = { focusManager.clearFocus() }
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary,
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
                                 cursorColor = Color(0xFF2EE6FF),
-                                focusedLabelColor = TextSecondary,
-                                unfocusedLabelColor = TextSecondary
+                                focusedLabelColor = textSecondary,
+                                unfocusedLabelColor = textSecondary
                             )
                         )
                     }
 
                     Spacer(Modifier.height(12.dp))
 
+                    val list = folders[selectedFolder] ?: emptyList()
                     val filtered = remember(list, query) {
-                        if (query.isBlank()) list
-                        else list.filter { it.name.contains(query, ignoreCase = true) }
+                        if (query.isBlank()) list else list.filter { it.name.contains(query, ignoreCase = true) }
                     }
 
                     if (filtered.isEmpty()) {
-                        Text("Nothing found", color = TextSecondary, modifier = Modifier.padding(horizontal = 4.dp))
+                        Text("Nothing found", color = textSecondary, modifier = Modifier.padding(horizontal = 4.dp))
                     }
 
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    DisposableEffect(currentFolder, folderListState) {
+                        onDispose {
+                            folderScrollSnapshotsState.value = folderScrollSnapshots.toMutableMap().apply {
+                                put(
+                                    currentFolder,
+                                    folderListState.firstVisibleItemIndex to folderListState.firstVisibleItemScrollOffset
+                                )
+                            }
+                        }
+                    }
+
+                    LazyColumn(
+                        state = folderListState,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         items(filtered.size) { index ->
-                            val f = filtered[index]
+                            val file = filtered[index]
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { actions.playTrack(f) }
+                                    .clickable { actions.playTrack(file) }
                                     .padding(vertical = 12.dp, horizontal = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    f.name,
-                                    color = TextPrimary,
+                                    file.name,
+                                    color = textPrimary,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -519,7 +555,7 @@ private fun Mp3BrowserAndPlayer(
                             if (index != filtered.lastIndex) {
                                 SeaDivider(
                                     modifier = Modifier.padding(horizontal = 6.dp),
-                                    brush = SeaBorder
+                                    brush = seaBorder
                                 )
                             }
                         }
@@ -539,7 +575,7 @@ private fun SmallGlassIconButton(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
         color = Color(0x1AFFFFFF),
         border = BorderStroke(1.dp, border),
         tonalElevation = 0.dp,
@@ -569,3 +605,27 @@ private fun SeaDivider(
             .background(brush)
     )
 }
+
+private fun requiredAudioPermission(): String {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+}
+
+private val FolderScrollSnapshotsSaver = listSaver<Map<String, Pair<Int, Int>>, String>(
+    save = { snapshots ->
+        snapshots.entries.flatMap { (folder, position) ->
+            listOf(folder, position.first.toString(), position.second.toString())
+        }
+    },
+    restore = { restored ->
+        restored.chunked(3).associate { chunk ->
+            val folder = chunk[0]
+            val index = chunk[1].toIntOrNull() ?: 0
+            val offset = chunk[2].toIntOrNull() ?: 0
+            folder to (index to offset)
+        }
+    }
+)

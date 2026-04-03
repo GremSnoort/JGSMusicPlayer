@@ -1,5 +1,6 @@
 package com.example.jgsmusicplayer.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -7,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +30,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,9 +50,6 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.common.Player
 
 import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
@@ -79,28 +77,19 @@ private fun formatRemainingMs(positionMs: Long, durationMs: Long): String {
 @Composable
 fun PlayerScreen(
     onBack: () -> Unit,
-    player: ExoPlayer,
     uiState: PlayerUiState,
+    onDismissError: () -> Unit,
     actions: PlayerActions
 ) {
+    BackHandler(onBack = onBack)
+
     var isUserSeeking by remember { mutableStateOf(false) }
     var seekPreviewMs by remember { mutableStateOf(0L) }
-
-    var isLooping by remember { mutableStateOf(player.repeatMode == Player.REPEAT_MODE_ONE) }
 
     LaunchedEffect(uiState.positionMs) {
         if (!isUserSeeking) {
             seekPreviewMs = uiState.positionMs
         }
-    }
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onRepeatModeChanged(repeatMode: Int) {
-                isLooping = repeatMode == Player.REPEAT_MODE_ONE
-            }
-        }
-        player.addListener(listener)
-        onDispose { player.removeListener(listener) }
     }
 
     val safeDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
@@ -167,6 +156,38 @@ fun PlayerScreen(
                     return@Column
                 }
 
+                uiState.errorMessage?.let { errorMessage ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0x22FF5B7A),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(listOf(Color(0x99FF5B7A), Color(0x99FFB36B)))
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = errorMessage,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "Dismiss",
+                                color = Color.White.copy(alpha = 0.92f),
+                                modifier = Modifier.padding(start = 12.dp).clickable { onDismissError() }
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 val timeBrush = Brush.linearGradient(
                     listOf(
                         Color(0xFF85EEFF), // cyan
@@ -218,7 +239,7 @@ fun PlayerScreen(
                         seekPreviewMs = (p * safeDuration).toLong()
                     },
                     onProgressChangeFinished = {
-                        player.seekTo(seekPreviewMs)
+                        actions.seekTo(seekPreviewMs)
                         isUserSeeking = false
                     },
                     onCenterClick = actions.playPause,
@@ -262,10 +283,7 @@ fun PlayerScreen(
                     ) {
                         GhostIconButton(
                             label = "⟲",
-                            onClick = {
-                                val target = (player.currentPosition - 10_000).coerceAtLeast(0L)
-                                player.seekTo(target)
-                            }
+                            onClick = { actions.seekBy(-10_000) }
                         )
 
                         Spacer(Modifier.width(18.dp))
@@ -283,12 +301,7 @@ fun PlayerScreen(
 
                         GhostIconButton(
                             label = "⟳",
-                            onClick = {
-                                val dur = if (player.duration > 0) player.duration else uiState.durationMs
-                                val target = (player.currentPosition + 10_000)
-                                    .coerceAtMost(if (dur > 0) dur else Long.MAX_VALUE)
-                                player.seekTo(target)
-                            }
+                            onClick = { actions.seekBy(10_000) }
                         )
                     }
 
@@ -305,17 +318,9 @@ fun PlayerScreen(
 
                         GlassIconButton(
                             label = "∞",
-                            onClick = {
-                                val newMode = if (player.repeatMode == Player.REPEAT_MODE_ONE)
-                                    Player.REPEAT_MODE_OFF
-                                else
-                                    Player.REPEAT_MODE_ONE
-
-                                player.repeatMode = newMode
-                                isLooping = (newMode == Player.REPEAT_MODE_ONE)
-                            },
+                            onClick = actions.toggleLooping,
                             size = 72.dp,
-                            isActive = isLooping
+                            isActive = uiState.isLooping
                         )
                     }
                 }
