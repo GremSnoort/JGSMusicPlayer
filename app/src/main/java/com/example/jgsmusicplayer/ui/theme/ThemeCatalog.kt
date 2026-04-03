@@ -17,6 +17,12 @@ enum class JGSThemeKey {
     LAGUNA,
     GATE,
     PATINA,
+    MAUSOLEUM_ONE,
+    MAUSOLEUM_TWO,
+    MAUSOLEUM_THREE,
+    MAUSOLEUM_FOUR,
+    MAUSOLEUM_FIVE,
+    MAUSOLEUM_SIX,
     GRASSLAND,
     GRASSLAND_TWO,
     SUN_DESERT
@@ -26,7 +32,8 @@ enum class JGSThemeKey {
 data class JGSBackgroundTokens(
     @param:DrawableRes val libraryBackgroundRes: Int,
     @param:DrawableRes val playerBackgroundRes: Int,
-    val overlayAlpha: Float = 0.55f
+    val overlayAlpha: Float = 0.55f,
+    val cropBiasX: Float = 0.5f
 )
 
 @Immutable
@@ -1071,6 +1078,108 @@ private val SunDesertTheme = JGSThemeSpec(
     )
 )
 
+private val MausoleumThemeOne = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_ONE,
+    displayName = "Mausoleum I",
+    buttonLabel = "Maus I",
+    designTokens = SunDesertTheme.designTokens.copy(
+        colors = SunDesertTheme.designTokens.colors.copy(
+            textPrimary = Color(0xFFF4E7C6),
+            textSecondary = Color(0xD9DBC59B),
+            textOnAccent = Color(0xFFF7EBD1),
+            topBarTitleGlow = Color(0x66D6A75D),
+            seekKnob = Color(0xFFE6BF73)
+        ),
+        brushes = SunDesertTheme.designTokens.brushes.copy(
+            topBarTitle = Brush.linearGradient(
+                listOf(
+                    Color(0xFFF5E7C9),
+                    Color(0xFFE2C48D),
+                    Color(0xFFB58F58),
+                    Color(0xFFF0E1C0)
+                )
+            )
+        )
+    ),
+    typography = SunDesertTheme.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_1,
+        playerBackgroundRes = R.drawable.bg_mausoleum_1,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeTwo = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_TWO,
+    displayName = "Mausoleum II",
+    buttonLabel = "Maus II",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_2,
+        playerBackgroundRes = R.drawable.bg_mausoleum_2,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeThree = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_THREE,
+    displayName = "Mausoleum III",
+    buttonLabel = "Maus III",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_3,
+        playerBackgroundRes = R.drawable.bg_mausoleum_3,
+        overlayAlpha = 0.58f,
+        cropBiasX = 0.9f
+    )
+)
+
+private val MausoleumThemeFour = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_FOUR,
+    displayName = "Mausoleum IV",
+    buttonLabel = "Maus IV",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_4,
+        playerBackgroundRes = R.drawable.bg_mausoleum_4,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeFive = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_FIVE,
+    displayName = "Mausoleum V",
+    buttonLabel = "Maus V",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_5,
+        playerBackgroundRes = R.drawable.bg_mausoleum_5,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeSix = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_SIX,
+    displayName = "Mausoleum VI",
+    buttonLabel = "Maus VI",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_6,
+        playerBackgroundRes = R.drawable.bg_mausoleum_6,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
 object JGSThemes {
     val all: List<JGSThemeSpec> = listOf(
         DeepOceanTheme,
@@ -1081,6 +1190,12 @@ object JGSThemes {
         GrasslandTheme,
         GrasslandThemeTwo,
         SunDesertTheme,
+        MausoleumThemeOne,
+        MausoleumThemeTwo,
+        MausoleumThemeThree,
+        MausoleumThemeFour,
+        MausoleumThemeFive,
+        MausoleumThemeSix,
         SunriverTheme,
         FrostpeakTheme
     )
