@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 data class JGSThemeController(
     val currentTheme: JGSThemeSpec,
     val currentButtonLabel: String,
-    val cycleTheme: () -> Unit
+    val cycleTheme: () -> Unit,
+    val setTheme: (JGSThemeKey) -> Unit
 )
 
 private val Context.themeDataStore by preferencesDataStore(name = "theme_prefs")
@@ -53,6 +54,15 @@ fun rememberJGSThemeController(): JGSThemeController {
                 scope.launch {
                     context.themeDataStore.edit { prefs ->
                         prefs[ThemeKeyPreference] = nextThemeKeyName
+                    }
+                }
+            },
+            setTheme = { key ->
+                val keyName = key.name
+                currentThemeKeyName = keyName
+                scope.launch {
+                    context.themeDataStore.edit { prefs ->
+                        prefs[ThemeKeyPreference] = keyName
                     }
                 }
             }

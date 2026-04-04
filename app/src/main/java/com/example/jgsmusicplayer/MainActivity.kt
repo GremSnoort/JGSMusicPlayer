@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.ImageView
 
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -14,8 +15,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -54,17 +57,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 
 import com.example.jgsmusicplayer.model.AudioFile
@@ -74,9 +82,16 @@ import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.screens.PlayerScreen
 import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
 import com.example.jgsmusicplayer.ui.theme.JGSMusicPlayerTheme
+import com.example.jgsmusicplayer.ui.theme.JGSThemeGroup
 import com.example.jgsmusicplayer.ui.theme.JGSTheme
+import com.example.jgsmusicplayer.ui.theme.JGSThemeKey
+import com.example.jgsmusicplayer.ui.theme.JGSThemeSpec
 import com.example.jgsmusicplayer.ui.theme.JGSThemedBackground
+import com.example.jgsmusicplayer.ui.theme.JGSThemes
 import com.example.jgsmusicplayer.ui.theme.rememberJGSThemeController
+
+import kotlin.math.atan2
+import kotlin.math.min
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -100,8 +115,9 @@ private fun AppRoot(viewModel: MainViewModel) {
     JGSMusicPlayerTheme(themeSpec = themeController.currentTheme) {
         App(
             viewModel = viewModel,
-            currentThemeButtonLabel = themeController.currentButtonLabel,
-            onCycleTheme = themeController.cycleTheme
+            currentThemeName = themeController.currentTheme.displayName,
+            currentThemeKey = themeController.currentTheme.key,
+            onSetTheme = themeController.setTheme
         )
     }
 }
@@ -109,8 +125,9 @@ private fun AppRoot(viewModel: MainViewModel) {
 @Composable
 private fun App(
     viewModel: MainViewModel,
-    currentThemeButtonLabel: String,
-    onCycleTheme: () -> Unit
+    currentThemeName: String,
+    currentThemeKey: JGSThemeKey,
+    onSetTheme: (JGSThemeKey) -> Unit
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
@@ -152,9 +169,29 @@ private fun App(
         }
     }
 
+    val openThemesCollection: () -> Unit = remember(navController) {
+        {
+            navController.navigate("themes_collection") {
+                launchSingleTop = true
+            }
+        }
+    }
+
     val returnToLibrary: () -> Unit = remember(navController) {
         {
             val returned = navController.popBackStack("library", inclusive = false)
+            if (!returned) {
+                navController.navigate("library") {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
+    val safePop: () -> Unit = remember(navController) {
+        {
+            val returned = navController.popBackStack()
             if (!returned) {
                 navController.navigate("library") {
                     popUpTo(navController.graph.startDestinationId) { inclusive = false }
@@ -179,6 +216,9 @@ private fun App(
         )
     }
 
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route.orEmpty()
+
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = "library") {
             composable("library") {
@@ -200,21 +240,68 @@ private fun App(
                     actions = actions
                 )
             }
+            composable("themes_collection") {
+                ThemesCollectionScreen(
+                    currentThemeName = currentThemeName,
+                    onBack = safePop,
+                    onOpenGroup = { group ->
+                        navController.navigate("themes_group/${group.name}") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+            composable("themes_group/{group}") { backStackEntry ->
+                val groupName = backStackEntry.arguments?.getString("group").orEmpty()
+                val group = JGSThemes.groupFromName(groupName)
+                ThemeGroupScreen(
+                    group = group,
+                    currentThemeKey = currentThemeKey,
+                    onBack = safePop,
+                    onSelectTheme = { theme ->
+                        onSetTheme(theme.key)
+                    },
+                    onOpenTheme = { theme ->
+                        navController.navigate("theme_detail/${theme.key.name}") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+            composable("theme_detail/{themeKey}") { backStackEntry ->
+                val keyName = backStackEntry.arguments?.getString("themeKey").orEmpty()
+                val theme = JGSThemes.fromKeyName(keyName)
+                ThemeDetailScreen(
+                    theme = theme,
+                    isActive = theme.key == currentThemeKey,
+                    onBack = safePop,
+                    onApply = {
+                        onSetTheme(theme.key)
+                        safePop()
+                    }
+                )
+            }
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .navigationBarsPadding()
-                .padding(
-                    start = JGSTheme.design.sizes.screenContentPadding,
-                    bottom = JGSTheme.design.sizes.sectionSpacingSmall
+        val isThemesRoute = currentRoute.startsWith("themes_collection") ||
+            currentRoute.startsWith("themes_group") ||
+            currentRoute.startsWith("theme_detail")
+
+        if (!isThemesRoute) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(
+                        start = JGSTheme.design.sizes.screenContentPadding,
+                        bottom = JGSTheme.design.sizes.sectionSpacingSmall
+                    )
+            ) {
+                BottomGlassActionButton(
+                    text = "Themes",
+                    onClick = openThemesCollection
                 )
-        ) {
-            BottomGlassActionButton(
-                text = currentThemeButtonLabel,
-                onClick = onCycleTheme
-            )
+            }
         }
     }
 }
@@ -723,6 +810,450 @@ private fun Mp3BrowserAndPlayer(
             }
         }
     }
+}
+
+@Composable
+private fun ThemesCollectionScreen(
+    currentThemeName: String,
+    onBack: () -> Unit,
+    onOpenGroup: (JGSThemeGroup) -> Unit
+) {
+    val design = JGSTheme.design
+    val groups = JGSThemes.groups
+
+    BackHandler(onBack = onBack)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(edgeSwipeBackModifier(onBack))
+    ) {
+        JGSThemedBackground(
+            target = JGSBackgroundTarget.LIBRARY,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Scaffold(
+            containerColor = design.colors.transparent,
+            topBar = {
+                NeonTopBar(
+                    title = "ThemesCollection",
+                    showBack = true,
+                    onBack = onBack
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(design.sizes.screenContentPadding)
+                    .fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Current: $currentThemeName",
+                    color = design.colors.textSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
+                ThemeGroupWheel(
+                    groups = groups,
+                    onOpenGroup = onOpenGroup,
+                    modifier = Modifier.size(280.dp)
+                )
+                Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    groups.forEach { group ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.clickable { onOpenGroup(group) }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(
+                                        color = groupColor(group),
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    )
+                            )
+                            Text(
+                                text = group.displayName,
+                                color = design.colors.textPrimary,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeGroupWheel(
+    groups: List<JGSThemeGroup>,
+    onOpenGroup: (JGSThemeGroup) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val sweep = 360f / groups.size
+
+    Box(
+        modifier = modifier
+            .pointerInput(groups) {
+                detectTapGestures { offset ->
+                    val diameter = min(size.width, size.height).toFloat()
+                    val radius = diameter / 2f
+                    val centerX = size.width / 2f
+                    val centerY = size.height / 2f
+                    val dx = offset.x - centerX
+                    val dy = offset.y - centerY
+                    val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+                    if (dist > radius) return@detectTapGestures
+                    var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                    angle = (angle + 450f) % 360f
+                    val index = (angle / sweep).toInt().coerceIn(0, groups.lastIndex)
+                    onOpenGroup(groups[index])
+                }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val diameter = size.minDimension
+            val topLeft = Offset(
+                (size.width - diameter) / 2f,
+                (size.height - diameter) / 2f
+            )
+            val rect = Rect(topLeft, androidx.compose.ui.geometry.Size(diameter, diameter))
+            groups.forEachIndexed { index, group ->
+                drawArc(
+                    color = groupColor(group),
+                    startAngle = -90f + (index * sweep),
+                    sweepAngle = sweep,
+                    useCenter = true,
+                    topLeft = rect.topLeft,
+                    size = rect.size
+                )
+            }
+        }
+    }
+}
+
+private fun groupColor(group: JGSThemeGroup): Color {
+    return when (group) {
+        JGSThemeGroup.MAUSOLEUM -> Color(0xFFC7A56B)
+        JGSThemeGroup.OCEAN -> Color(0xFF4FC3E8)
+        JGSThemeGroup.RIVER -> Color(0xFF7BC8A4)
+        JGSThemeGroup.FROST -> Color(0xFFB8D9FF)
+        JGSThemeGroup.GATES -> Color(0xFF8DAA8F)
+        JGSThemeGroup.LEAVES -> Color(0xFF7FBF7A)
+        JGSThemeGroup.DUNES -> Color(0xFFE4B86C)
+    }
+}
+
+@Composable
+private fun ThemeGroupScreen(
+    group: JGSThemeGroup,
+    currentThemeKey: JGSThemeKey,
+    onBack: () -> Unit,
+    onSelectTheme: (JGSThemeSpec) -> Unit,
+    onOpenTheme: (JGSThemeSpec) -> Unit
+) {
+    val design = JGSTheme.design
+    val themes = remember(group) { JGSThemes.byGroup(group) }
+
+    BackHandler(onBack = onBack)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(edgeSwipeBackModifier(onBack))
+    ) {
+        JGSThemedBackground(
+            target = JGSBackgroundTarget.LIBRARY,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Scaffold(
+            containerColor = design.colors.transparent,
+            topBar = {
+                NeonTopBar(
+                    title = group.displayName,
+                    showBack = true,
+                    onBack = onBack
+                )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(design.sizes.screenContentPadding)
+                    .fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(design.sizes.sectionSpacingSmall)
+            ) {
+                items(themes.size) { index ->
+                    val theme = themes[index]
+                    ThemeCard(
+                        theme = theme,
+                        isActive = theme.key == currentThemeKey,
+                        onOpen = { onOpenTheme(theme) },
+                        onApply = { onSelectTheme(theme) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeDetailScreen(
+    theme: JGSThemeSpec,
+    isActive: Boolean,
+    onBack: () -> Unit,
+    onApply: () -> Unit
+) {
+    JGSMusicPlayerTheme(themeSpec = theme) {
+        val design = JGSTheme.design
+
+        BackHandler(onBack = onBack)
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(edgeSwipeBackModifier(onBack))
+        ) {
+            ThemePreviewBackground(
+                theme = theme,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Scaffold(
+                containerColor = design.colors.transparent,
+                topBar = {
+                    NeonTopBar(
+                        title = theme.displayName,
+                        showBack = true,
+                        onBack = onBack
+                    )
+                }
+            ) { padding ->
+                Column(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize(),
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = design.sizes.screenContentPadding,
+                                vertical = design.sizes.sectionSpacingLarge
+                            )
+                            .background(
+                                color = design.colors.glassSurface,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner)
+                            )
+                            .padding(design.sizes.sectionSpacingMedium),
+                        verticalArrangement = Arrangement.spacedBy(design.sizes.sectionSpacingSmall)
+                    ) {
+                        Text(
+                            text = theme.description,
+                            color = design.colors.textSecondary,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        if (isActive) {
+                            Text(
+                                text = "Active",
+                                color = design.colors.textPrimary,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+
+                        Surface(
+                            onClick = onApply,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+                            color = design.colors.transparent,
+                            border = BorderStroke(1.dp, design.brushes.primaryBorder),
+                            tonalElevation = 0.dp,
+                            shadowElevation = 0.dp
+                        ) {
+                            Text(
+                                text = if (isActive) "Applied" else "Apply",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                textAlign = TextAlign.Center,
+                                color = design.colors.textPrimary,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeCard(
+    theme: JGSThemeSpec,
+    isActive: Boolean,
+    onOpen: () -> Unit,
+    onApply: () -> Unit
+) {
+    val design = JGSTheme.design
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpen() },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+        color = design.colors.glassSurface,
+        border = BorderStroke(1.dp, design.brushes.primaryBorder),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ThemePreviewImage(
+                backgroundRes = theme.backgrounds.libraryBackgroundRes,
+                modifier = Modifier
+                    .size(64.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = theme.displayName,
+                    color = design.colors.textPrimary,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = theme.description,
+                    color = design.colors.textSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (isActive) {
+                    Text(
+                        text = "Active",
+                        color = design.colors.textPrimary,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+            Surface(
+                onClick = onApply,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.smallButtonCorner),
+                color = design.colors.transparent,
+                border = BorderStroke(1.dp, design.brushes.primaryBorder),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
+            ) {
+                Text(
+                    text = if (isActive) "Applied" else "Use",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = design.colors.textOnAccent,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemePreviewImage(
+    backgroundRes: Int,
+    modifier: Modifier = Modifier
+) {
+    AndroidView(
+        factory = { context ->
+            ImageView(context).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageResource(backgroundRes)
+            }
+        },
+        update = { imageView ->
+            imageView.setImageResource(backgroundRes)
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun ThemePreviewBackground(
+    theme: JGSThemeSpec,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { context ->
+                ImageView(context).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    setImageResource(theme.backgrounds.libraryBackgroundRes)
+                }
+            },
+            update = { imageView ->
+                imageView.setImageResource(theme.backgrounds.libraryBackgroundRes)
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = theme.designTokens.brushes.appBackground,
+                    alpha = theme.backgrounds.overlayAlpha
+                )
+        )
+    }
+}
+
+@Composable
+private fun edgeSwipeBackModifier(
+    onBack: () -> Unit
+): Modifier {
+    val design = JGSTheme.design
+    val density = LocalDensity.current
+    val cfg = LocalConfiguration.current
+    val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
+    val edgePx = with(density) { design.sizes.edgeSwipeZone.toPx() }
+    val triggerPx = with(density) { design.sizes.edgeSwipeTrigger.toPx() }
+
+    var dragSum by remember { mutableStateOf(0f) }
+    var backTriggered by remember { mutableStateOf(false) }
+    var isEdgeDrag by remember { mutableStateOf(false) }
+
+    return Modifier
+        .pointerInput(Unit) {}
+        .draggable(
+            orientation = Orientation.Horizontal,
+            state = rememberDraggableState { delta ->
+                if (!isEdgeDrag || backTriggered) return@rememberDraggableState
+
+                dragSum += delta
+                if (dragSum <= -triggerPx) {
+                    backTriggered = true
+                    onBack()
+                }
+            },
+            onDragStarted = { startOffset ->
+                dragSum = 0f
+                backTriggered = false
+                isEdgeDrag = startOffset.x >= (screenWidthPx - edgePx)
+            },
+            onDragStopped = {
+                isEdgeDrag = false
+                dragSum = 0f
+                backTriggered = false
+            }
+        )
 }
 
 @Composable

@@ -28,6 +28,16 @@ enum class JGSThemeKey {
     SUN_DESERT
 }
 
+enum class JGSThemeGroup(val displayName: String, val shortLabel: String) {
+    MAUSOLEUM("Mausoleum", "Maus"),
+    OCEAN("Ocean", "Ocean"),
+    RIVER("River", "River"),
+    FROST("Frost", "Frost"),
+    GATES("Gates", "Gates"),
+    LEAVES("Leaves", "Leaves"),
+    DUNES("Dunes", "Dunes")
+}
+
 @Immutable
 data class JGSBackgroundTokens(
     @param:DrawableRes val libraryBackgroundRes: Int,
@@ -41,6 +51,8 @@ data class JGSThemeSpec(
     val key: JGSThemeKey,
     val displayName: String,
     val buttonLabel: String,
+    val group: JGSThemeGroup,
+    val description: String,
     val designTokens: JGSDesignTokens,
     val typography: Typography,
     val backgrounds: JGSBackgroundTokens
@@ -50,6 +62,8 @@ private val DeepOceanTheme = JGSThemeSpec(
     key = JGSThemeKey.DEEP_OCEAN,
     displayName = "Deep Ocean",
     buttonLabel = "Deep",
+    group = JGSThemeGroup.OCEAN,
+    description = "Deep neon ocean glow.",
     designTokens = DefaultJGSDesignTokens,
     typography = DeepOceanTypography,
     backgrounds = JGSBackgroundTokens(
@@ -63,6 +77,8 @@ private val CoastalLightTheme = JGSThemeSpec(
     key = JGSThemeKey.COASTAL_LIGHT,
     displayName = "Coastal Light",
     buttonLabel = "Coast",
+    group = JGSThemeGroup.OCEAN,
+    description = "Bright coastal breeze.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFFE7F7FB),
@@ -203,6 +219,8 @@ private val GrasslandTheme = JGSThemeSpec(
     key = JGSThemeKey.GRASSLAND,
     displayName = "Dewleaf 1",
     buttonLabel = "Dew 1",
+    group = JGSThemeGroup.LEAVES,
+    description = "Dewy leaves and soft greens.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFF0E1A12),
@@ -342,6 +360,8 @@ private val GrasslandThemeTwo = JGSThemeSpec(
     key = JGSThemeKey.GRASSLAND_TWO,
     displayName = "Dewleaf 2",
     buttonLabel = "Dew 2",
+    group = JGSThemeGroup.LEAVES,
+    description = "Deeper greens with rainlight.",
     designTokens = GrasslandTheme.designTokens,
     typography = GrasslandTheme.typography,
     backgrounds = JGSBackgroundTokens(
@@ -355,6 +375,8 @@ private val SunriverTheme = JGSThemeSpec(
     key = JGSThemeKey.SUNRIVER,
     displayName = "Sunriver",
     buttonLabel = "River",
+    group = JGSThemeGroup.RIVER,
+    description = "Warm river at sunset.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFF181A1B),
@@ -494,6 +516,8 @@ private val FrostpeakTheme = JGSThemeSpec(
     key = JGSThemeKey.FROSTPEAK,
     displayName = "Frostpeak",
     buttonLabel = "Frost",
+    group = JGSThemeGroup.FROST,
+    description = "Frozen mountain stream.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFF0D131C),
@@ -634,6 +658,8 @@ private val LagunaTheme = JGSThemeSpec(
     key = JGSThemeKey.LAGUNA,
     displayName = "Laguna",
     buttonLabel = "Laguna",
+    group = JGSThemeGroup.OCEAN,
+    description = "Clear lagoons and sea glass.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFF0E1820),
@@ -774,6 +800,8 @@ private val GateTheme = JGSThemeSpec(
     key = JGSThemeKey.GATE,
     displayName = "Gate",
     buttonLabel = "Gate",
+    group = JGSThemeGroup.GATES,
+    description = "Dark brass and emerald gate.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFF100E0B),
@@ -913,6 +941,8 @@ private val PatinaTheme = JGSThemeSpec(
     key = JGSThemeKey.PATINA,
     displayName = "Patina",
     buttonLabel = "Patina",
+    group = JGSThemeGroup.GATES,
+    description = "Verdigris brass patina.",
     designTokens = GateTheme.designTokens.copy(
         colors = GateTheme.designTokens.colors.copy(
             textPrimary = Color(0xFFE2D7B7),
@@ -943,6 +973,8 @@ private val SunDesertTheme = JGSThemeSpec(
     key = JGSThemeKey.SUN_DESERT,
     displayName = "Sun Desert",
     buttonLabel = "Dune",
+    group = JGSThemeGroup.DUNES,
+    description = "Amber dunes and warm sand.",
     designTokens = DefaultJGSDesignTokens.copy(
         colors = DefaultJGSDesignTokens.colors.copy(
             backgroundBase = Color(0xFF26170D),
@@ -1082,6 +1114,8 @@ private val MausoleumThemeOne = JGSThemeSpec(
     key = JGSThemeKey.MAUSOLEUM_ONE,
     displayName = "Mausoleum I",
     buttonLabel = "Maus I",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series I.",
     designTokens = SunDesertTheme.designTokens.copy(
         colors = SunDesertTheme.designTokens.colors.copy(
             textPrimary = Color(0xFFF4E7C6),
@@ -1114,6 +1148,8 @@ private val MausoleumThemeTwo = JGSThemeSpec(
     key = JGSThemeKey.MAUSOLEUM_TWO,
     displayName = "Mausoleum II",
     buttonLabel = "Maus II",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series II.",
     designTokens = MausoleumThemeOne.designTokens,
     typography = MausoleumThemeOne.typography,
     backgrounds = JGSBackgroundTokens(
@@ -1128,6 +1164,8 @@ private val MausoleumThemeThree = JGSThemeSpec(
     key = JGSThemeKey.MAUSOLEUM_THREE,
     displayName = "Mausoleum III",
     buttonLabel = "Maus III",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series III.",
     designTokens = MausoleumThemeOne.designTokens,
     typography = MausoleumThemeOne.typography,
     backgrounds = JGSBackgroundTokens(
@@ -1142,6 +1180,8 @@ private val MausoleumThemeFour = JGSThemeSpec(
     key = JGSThemeKey.MAUSOLEUM_FOUR,
     displayName = "Mausoleum IV",
     buttonLabel = "Maus IV",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series IV.",
     designTokens = MausoleumThemeOne.designTokens,
     typography = MausoleumThemeOne.typography,
     backgrounds = JGSBackgroundTokens(
@@ -1156,6 +1196,8 @@ private val MausoleumThemeFive = JGSThemeSpec(
     key = JGSThemeKey.MAUSOLEUM_FIVE,
     displayName = "Mausoleum V",
     buttonLabel = "Maus V",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series V.",
     designTokens = MausoleumThemeOne.designTokens,
     typography = MausoleumThemeOne.typography,
     backgrounds = JGSBackgroundTokens(
@@ -1170,6 +1212,8 @@ private val MausoleumThemeSix = JGSThemeSpec(
     key = JGSThemeKey.MAUSOLEUM_SIX,
     displayName = "Mausoleum VI",
     buttonLabel = "Maus VI",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series VI.",
     designTokens = MausoleumThemeOne.designTokens,
     typography = MausoleumThemeOne.typography,
     backgrounds = JGSBackgroundTokens(
@@ -1200,15 +1244,33 @@ object JGSThemes {
         FrostpeakTheme
     )
 
+    val groups: List<JGSThemeGroup> = listOf(
+        JGSThemeGroup.MAUSOLEUM,
+        JGSThemeGroup.OCEAN,
+        JGSThemeGroup.RIVER,
+        JGSThemeGroup.FROST,
+        JGSThemeGroup.GATES,
+        JGSThemeGroup.LEAVES,
+        JGSThemeGroup.DUNES
+    )
+
     val default: JGSThemeSpec = DeepOceanTheme
 
     fun byKey(key: JGSThemeKey): JGSThemeSpec {
         return all.firstOrNull { it.key == key } ?: default
     }
 
+    fun byGroup(group: JGSThemeGroup): List<JGSThemeSpec> {
+        return all.filter { it.group == group }
+    }
+
     fun fromKeyName(name: String): JGSThemeSpec {
         val key = runCatching { JGSThemeKey.valueOf(name) }.getOrNull() ?: default.key
         return byKey(key)
+    }
+
+    fun groupFromName(name: String): JGSThemeGroup {
+        return runCatching { JGSThemeGroup.valueOf(name) }.getOrNull() ?: JGSThemeGroup.OCEAN
     }
 
     fun nextTheme(after: JGSThemeSpec): JGSThemeSpec {
