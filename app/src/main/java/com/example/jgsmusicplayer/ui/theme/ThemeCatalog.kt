@@ -15,6 +15,8 @@ enum class JGSThemeKey {
     SUNRIVER,
     FROSTPEAK,
     LAGUNA,
+    LAGOON_TWO,
+    LAGOON_THREE,
     GATE,
     PATINA,
     MAUSOLEUM_ONE,
@@ -664,10 +666,10 @@ private val FrostpeakTheme = JGSThemeSpec(
     )
 )
 
-private val LagunaTheme = JGSThemeSpec(
+private val LagoonThemeOne = JGSThemeSpec(
     key = JGSThemeKey.LAGUNA,
-    displayName = "Laguna",
-    buttonLabel = "Laguna",
+    displayName = "Lagoon I",
+    buttonLabel = "Lagoon I",
     group = JGSThemeGroup.OCEAN,
     description = "Clear lagoons and sea glass.",
     designTokens = DefaultJGSDesignTokens.copy(
@@ -800,8 +802,38 @@ private val LagunaTheme = JGSThemeSpec(
     ),
     typography = CoastalLightTypography,
     backgrounds = JGSBackgroundTokens(
-        libraryBackgroundRes = R.drawable.bg_laguna,
-        playerBackgroundRes = R.drawable.bg_laguna,
+        libraryBackgroundRes = R.drawable.bg_lagoon_1,
+        playerBackgroundRes = R.drawable.bg_lagoon_1,
+        overlayAlpha = 0.44f
+    )
+)
+
+private val LagoonThemeTwo = JGSThemeSpec(
+    key = JGSThemeKey.LAGOON_TWO,
+    displayName = "Lagoon II",
+    buttonLabel = "Lagoon II",
+    group = JGSThemeGroup.OCEAN,
+    description = "Calm lagoon in warm light.",
+    designTokens = LagoonThemeOne.designTokens,
+    typography = LagoonThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_lagoon_2,
+        playerBackgroundRes = R.drawable.bg_lagoon_2,
+        overlayAlpha = 0.44f
+    )
+)
+
+private val LagoonThemeThree = JGSThemeSpec(
+    key = JGSThemeKey.LAGOON_THREE,
+    displayName = "Lagoon III",
+    buttonLabel = "Lagoon III",
+    group = JGSThemeGroup.OCEAN,
+    description = "Deep lagoon clarity.",
+    designTokens = LagoonThemeOne.designTokens,
+    typography = LagoonThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_lagoon_3,
+        playerBackgroundRes = R.drawable.bg_lagoon_3,
         overlayAlpha = 0.44f
     )
 )
@@ -1389,7 +1421,9 @@ object JGSThemes {
     val all: List<JGSThemeSpec> = listOf(
         DeepOceanTheme,
         CoastalLightTheme,
-        LagunaTheme,
+        LagoonThemeOne,
+        LagoonThemeTwo,
+        LagoonThemeThree,
         GateTheme,
         PatinaTheme,
         GrasslandTheme,
