@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.map
@@ -23,34 +24,84 @@ data class JGSThemeController(
     val currentTheme: JGSThemeSpec,
     val currentButtonLabel: String,
     val cycleTheme: () -> Unit,
-    val setTheme: (JGSThemeKey) -> Unit
+    val setTheme: (JGSThemeKey) -> Unit,
+    val getThemeBias: (JGSThemeKey) -> ThemeBias?,
+    val setThemeBias: (JGSThemeKey, ThemeBias) -> Unit
 )
 
 private val Context.themeDataStore by preferencesDataStore(name = "theme_prefs")
 private val ThemeKeyPreference = stringPreferencesKey("theme_key")
+private const val SyncPrefsName = "theme_prefs_sync"
+private const val SyncThemeKey = "theme_key"
+
+@Immutable
+data class ThemeBias(
+    val x: Float,
+    val y: Float
+)
+
+private fun biasXKey(key: JGSThemeKey) = floatPreferencesKey("theme_bias_x_${key.name}")
+private fun biasYKey(key: JGSThemeKey) = floatPreferencesKey("theme_bias_y_${key.name}")
+
+private fun loadBiasMap(prefs: androidx.datastore.preferences.core.Preferences): Map<JGSThemeKey, ThemeBias> {
+    return JGSThemes.all.mapNotNull { theme ->
+        val x = prefs[biasXKey(theme.key)]
+        val y = prefs[biasYKey(theme.key)]
+        if (x != null && y != null) {
+            theme.key to ThemeBias(x, y)
+        } else {
+            null
+        }
+    }.toMap()
+}
+
+private fun applyBias(theme: JGSThemeSpec, biasMap: Map<JGSThemeKey, ThemeBias>): JGSThemeSpec {
+    val bias = biasMap[theme.key] ?: return theme
+    return theme.copy(
+        backgrounds = theme.backgrounds.copy(
+            cropBiasX = bias.x,
+            cropBiasY = bias.y
+        )
+    )
+}
 
 @Composable
 fun rememberJGSThemeController(): JGSThemeController {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val syncPrefs = remember(context) {
+        context.getSharedPreferences(SyncPrefsName, Context.MODE_PRIVATE)
+    }
+    val syncThemeKeyName = remember(syncPrefs) {
+        syncPrefs.getString(SyncThemeKey, null) ?: JGSThemes.default.key.name
+    }
     val storedThemeKeyName by context.themeDataStore.data
-        .map { prefs -> prefs[ThemeKeyPreference] ?: JGSThemes.default.key.name }
-        .collectAsState(initial = JGSThemes.default.key.name)
+        .map { prefs -> prefs[ThemeKeyPreference] ?: syncThemeKeyName }
+        .collectAsState(initial = syncThemeKeyName)
+    val biasMap by context.themeDataStore.data
+        .map { prefs -> loadBiasMap(prefs) }
+        .collectAsState(initial = emptyMap())
 
-    var currentThemeKeyName by rememberSaveable { mutableStateOf(storedThemeKeyName) }
+    var currentThemeKeyName by rememberSaveable { mutableStateOf(syncThemeKeyName) }
+    var localBiasOverrides by remember { mutableStateOf<Map<JGSThemeKey, ThemeBias>>(emptyMap()) }
 
     LaunchedEffect(storedThemeKeyName) {
         currentThemeKeyName = storedThemeKeyName
     }
-    val currentTheme = remember(currentThemeKeyName) { JGSThemes.fromKeyName(currentThemeKeyName) }
+    val baseTheme = remember(currentThemeKeyName) { JGSThemes.fromKeyName(currentThemeKeyName) }
+    val mergedBiasMap = remember(biasMap, localBiasOverrides) {
+        biasMap + localBiasOverrides
+    }
+    val currentTheme = remember(baseTheme, mergedBiasMap) { applyBias(baseTheme, mergedBiasMap) }
 
-    return remember(currentTheme, currentThemeKeyName) {
+    return remember(currentTheme, currentThemeKeyName, mergedBiasMap) {
         JGSThemeController(
             currentTheme = currentTheme,
             currentButtonLabel = currentTheme.buttonLabel,
             cycleTheme = {
                 val nextThemeKeyName = JGSThemes.nextTheme(currentTheme).key.name
                 currentThemeKeyName = nextThemeKeyName
+                syncPrefs.edit().putString(SyncThemeKey, nextThemeKeyName).apply()
                 scope.launch {
                     context.themeDataStore.edit { prefs ->
                         prefs[ThemeKeyPreference] = nextThemeKeyName
@@ -60,9 +111,20 @@ fun rememberJGSThemeController(): JGSThemeController {
             setTheme = { key ->
                 val keyName = key.name
                 currentThemeKeyName = keyName
+                syncPrefs.edit().putString(SyncThemeKey, keyName).apply()
                 scope.launch {
                     context.themeDataStore.edit { prefs ->
                         prefs[ThemeKeyPreference] = keyName
+                    }
+                }
+            },
+            getThemeBias = { key -> biasMap[key] },
+            setThemeBias = { key, bias ->
+                localBiasOverrides = localBiasOverrides + (key to bias)
+                scope.launch {
+                    context.themeDataStore.edit { prefs ->
+                        prefs[biasXKey(key)] = bias.x
+                        prefs[biasYKey(key)] = bias.y
                     }
                 }
             }

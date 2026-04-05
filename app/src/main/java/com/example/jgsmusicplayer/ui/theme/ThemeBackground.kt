@@ -38,11 +38,11 @@ fun JGSThemedBackground(
             },
             update = { imageView ->
                 imageView.setImageResource(backgroundRes)
-                if (applyCropBias(imageView, backgrounds.cropBiasX)) {
+                if (applyCropBias(imageView, backgrounds.cropBiasX, backgrounds.cropBiasY)) {
                     imageView.alpha = 1f
                 } else {
                     imageView.post {
-                        if (applyCropBias(imageView, backgrounds.cropBiasX)) {
+                        if (applyCropBias(imageView, backgrounds.cropBiasX, backgrounds.cropBiasY)) {
                             imageView.alpha = 1f
                         }
                     }
@@ -61,7 +61,7 @@ fun JGSThemedBackground(
     }
 }
 
-private fun applyCropBias(imageView: ImageView, biasX: Float): Boolean {
+private fun applyCropBias(imageView: ImageView, biasX: Float, biasY: Float): Boolean {
     val drawable = imageView.drawable ?: return false
     val viewW = imageView.width.toFloat()
     val viewH = imageView.height.toFloat()
@@ -74,6 +74,7 @@ private fun applyCropBias(imageView: ImageView, biasX: Float): Boolean {
     val viewRatio = viewW / viewH
     val imgRatio = dw / dh
     val bias = biasX.coerceIn(0f, 1f)
+    val biasYClamped = biasY.coerceIn(0f, 1f)
 
     val scale: Float
     val dx: Float
@@ -85,14 +86,14 @@ private fun applyCropBias(imageView: ImageView, biasX: Float): Boolean {
         val scaledW = dw * scale
         val scaledH = dh * scale
         dx = (viewW - scaledW) * bias
-        dy = (viewH - scaledH) * 0.5f
+        dy = (viewH - scaledH) * biasYClamped
     } else {
         // Image is taller than the view. Match width, crop height, center vertically.
         scale = viewW / dw
         val scaledW = dw * scale
         val scaledH = dh * scale
-        dx = (viewW - scaledW) * 0.5f
-        dy = (viewH - scaledH) * 0.5f
+        dx = (viewW - scaledW) * bias
+        dy = (viewH - scaledH) * biasYClamped
     }
 
     imageView.imageMatrix = Matrix().apply {

@@ -15,10 +15,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -36,6 +35,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -57,7 +59,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -89,9 +91,8 @@ import com.example.jgsmusicplayer.ui.theme.JGSThemeSpec
 import com.example.jgsmusicplayer.ui.theme.JGSThemedBackground
 import com.example.jgsmusicplayer.ui.theme.JGSThemes
 import com.example.jgsmusicplayer.ui.theme.rememberJGSThemeController
+import com.example.jgsmusicplayer.ui.theme.ThemeBias
 
-import kotlin.math.atan2
-import kotlin.math.min
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -117,7 +118,9 @@ private fun AppRoot(viewModel: MainViewModel) {
             viewModel = viewModel,
             currentThemeName = themeController.currentTheme.displayName,
             currentThemeKey = themeController.currentTheme.key,
-            onSetTheme = themeController.setTheme
+            onSetTheme = themeController.setTheme,
+            getThemeBias = themeController.getThemeBias,
+            onSetThemeBias = themeController.setThemeBias
         )
     }
 }
@@ -127,7 +130,9 @@ private fun App(
     viewModel: MainViewModel,
     currentThemeName: String,
     currentThemeKey: JGSThemeKey,
-    onSetTheme: (JGSThemeKey) -> Unit
+    onSetTheme: (JGSThemeKey) -> Unit,
+    getThemeBias: (JGSThemeKey) -> ThemeBias?,
+    onSetThemeBias: (JGSThemeKey, ThemeBias) -> Unit
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
@@ -271,10 +276,32 @@ private fun App(
             composable("theme_detail/{themeKey}") { backStackEntry ->
                 val keyName = backStackEntry.arguments?.getString("themeKey").orEmpty()
                 val theme = JGSThemes.fromKeyName(keyName)
+                val groupThemes = JGSThemes.byGroup(theme.group)
+                val currentIndex = groupThemes.indexOfFirst { it.key == theme.key }
+                val prevTheme = groupThemes.getOrNull(currentIndex - 1)
+                val nextTheme = groupThemes.getOrNull(currentIndex + 1)
                 ThemeDetailScreen(
                     theme = theme,
                     isActive = theme.key == currentThemeKey,
                     onBack = safePop,
+                    getThemeBias = getThemeBias,
+                    onSetThemeBias = onSetThemeBias,
+                    onPrev = prevTheme?.let {
+                        {
+                            navController.popBackStack()
+                            navController.navigate("theme_detail/${it.key.name}") {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    onNext = nextTheme?.let {
+                        {
+                            navController.popBackStack()
+                            navController.navigate("theme_detail/${it.key.name}") {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                     onApply = {
                         onSetTheme(theme.key)
                         safePop()
@@ -856,36 +883,17 @@ private fun ThemesCollectionScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
-                ThemeGroupWheel(
-                    groups = groups,
-                    onOpenGroup = onOpenGroup,
-                    modifier = Modifier.size(280.dp)
-                )
-                Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 140.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(design.sizes.sectionSpacingSmall),
+                    horizontalArrangement = Arrangement.spacedBy(design.sizes.sectionSpacingSmall)
                 ) {
-                    groups.forEach { group ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.clickable { onOpenGroup(group) }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .background(
-                                        color = groupColor(group),
-                                        shape = androidx.compose.foundation.shape.CircleShape
-                                    )
-                            )
-                            Text(
-                                text = group.displayName,
-                                color = design.colors.textPrimary,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
+                    items(groups) { group ->
+                        ThemeGroupTile(
+                            group = group,
+                            onOpenGroup = onOpenGroup
+                        )
                     }
                 }
             }
@@ -894,62 +902,44 @@ private fun ThemesCollectionScreen(
 }
 
 @Composable
-private fun ThemeGroupWheel(
-    groups: List<JGSThemeGroup>,
-    onOpenGroup: (JGSThemeGroup) -> Unit,
-    modifier: Modifier = Modifier
+private fun ThemeGroupTile(
+    group: JGSThemeGroup,
+    onOpenGroup: (JGSThemeGroup) -> Unit
 ) {
-    val sweep = 360f / groups.size
+    val design = JGSTheme.design
+    val previewTheme = remember(group) { JGSThemes.byGroup(group).firstOrNull() }
 
-    Box(
-        modifier = modifier
-            .pointerInput(groups) {
-                detectTapGestures { offset ->
-                    val diameter = min(size.width, size.height).toFloat()
-                    val radius = diameter / 2f
-                    val centerX = size.width / 2f
-                    val centerY = size.height / 2f
-                    val dx = offset.x - centerX
-                    val dy = offset.y - centerY
-                    val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                    if (dist > radius) return@detectTapGestures
-                    var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-                    angle = (angle + 450f) % 360f
-                    val index = (angle / sweep).toInt().coerceIn(0, groups.lastIndex)
-                    onOpenGroup(groups[index])
-                }
-            }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenGroup(group) },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+        color = design.colors.glassSurface,
+        border = BorderStroke(1.dp, design.brushes.primaryBorder),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val diameter = size.minDimension
-            val topLeft = Offset(
-                (size.width - diameter) / 2f,
-                (size.height - diameter) / 2f
-            )
-            val rect = Rect(topLeft, androidx.compose.ui.geometry.Size(diameter, diameter))
-            groups.forEachIndexed { index, group ->
-                drawArc(
-                    color = groupColor(group),
-                    startAngle = -90f + (index * sweep),
-                    sweepAngle = sweep,
-                    useCenter = true,
-                    topLeft = rect.topLeft,
-                    size = rect.size
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (previewTheme != null) {
+                ThemePreviewImage(
+                    backgroundRes = previewTheme.backgrounds.libraryBackgroundRes,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
                 )
             }
+            Text(
+                text = group.displayName,
+                color = design.colors.textPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 6.dp)
+            )
         }
-    }
-}
-
-private fun groupColor(group: JGSThemeGroup): Color {
-    return when (group) {
-        JGSThemeGroup.MAUSOLEUM -> Color(0xFFC7A56B)
-        JGSThemeGroup.OCEAN -> Color(0xFF4FC3E8)
-        JGSThemeGroup.RIVER -> Color(0xFF7BC8A4)
-        JGSThemeGroup.FROST -> Color(0xFFB8D9FF)
-        JGSThemeGroup.GATES -> Color(0xFF8DAA8F)
-        JGSThemeGroup.LEAVES -> Color(0xFF7FBF7A)
-        JGSThemeGroup.DUNES -> Color(0xFFE4B86C)
     }
 }
 
@@ -1012,10 +1002,27 @@ private fun ThemeDetailScreen(
     theme: JGSThemeSpec,
     isActive: Boolean,
     onBack: () -> Unit,
+    getThemeBias: (JGSThemeKey) -> ThemeBias?,
+    onSetThemeBias: (JGSThemeKey, ThemeBias) -> Unit,
+    onPrev: (() -> Unit)?,
+    onNext: (() -> Unit)?,
     onApply: () -> Unit
 ) {
     JGSMusicPlayerTheme(themeSpec = theme) {
         val design = JGSTheme.design
+        val initialBias = getThemeBias(theme.key)
+            ?: ThemeBias(theme.backgrounds.cropBiasX, theme.backgrounds.cropBiasY)
+        var biasX by remember(theme.key) { mutableStateOf(initialBias.x) }
+        var biasY by remember(theme.key) { mutableStateOf(initialBias.y) }
+        LaunchedEffect(theme.key, initialBias.x, initialBias.y) {
+            biasX = initialBias.x
+            biasY = initialBias.y
+        }
+        val density = LocalDensity.current
+        val cfg = LocalConfiguration.current
+        val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
+        val edgePx = with(density) { design.sizes.edgeSwipeZone.toPx() }
+        var allowDrag by remember(theme.key) { mutableStateOf(false) }
 
         BackHandler(onBack = onBack)
 
@@ -1023,9 +1030,29 @@ private fun ThemeDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .then(edgeSwipeBackModifier(onBack))
+                .pointerInput(theme.key) {
+                    detectDragGestures(
+                        onDragStart = { startOffset ->
+                            allowDrag = startOffset.x < (screenWidthPx - edgePx)
+                        },
+                        onDragEnd = { allowDrag = false },
+                        onDragCancel = { allowDrag = false },
+                        onDrag = { change, dragAmount ->
+                            if (!allowDrag) return@detectDragGestures
+                            change.consume()
+                            val w = size.width
+                            val h = size.height
+                            if (w <= 0f || h <= 0f) return@detectDragGestures
+                            biasX = (biasX - dragAmount.x / w).coerceIn(0f, 1f)
+                            biasY = (biasY - dragAmount.y / h).coerceIn(0f, 1f)
+                        }
+                    )
+                }
         ) {
             ThemePreviewBackground(
                 theme = theme,
+                cropBiasX = biasX,
+                cropBiasY = biasY,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -1060,6 +1087,11 @@ private fun ThemeDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(design.sizes.sectionSpacingSmall)
                     ) {
                         Text(
+                            text = "Drag to adjust framing",
+                            color = design.colors.textSecondary,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Text(
                             text = theme.description,
                             color = design.colors.textSecondary,
                             style = MaterialTheme.typography.bodyMedium
@@ -1074,7 +1106,10 @@ private fun ThemeDetailScreen(
                         }
 
                         Surface(
-                            onClick = onApply,
+                            onClick = {
+                                onSetThemeBias(theme.key, ThemeBias(biasX, biasY))
+                                onApply()
+                            },
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
                             color = design.colors.transparent,
                             border = BorderStroke(1.dp, design.brushes.primaryBorder),
@@ -1092,6 +1127,58 @@ private fun ThemeDetailScreen(
                             )
                         }
                     }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp)
+                    .zIndex(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (onPrev != null) {
+                    Surface(
+                        onClick = onPrev,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+                        color = design.colors.glassSurface,
+                        border = BorderStroke(1.dp, design.brushes.primaryBorder),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "‹",
+                                color = design.colors.textPrimary,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.size(44.dp))
+                }
+                if (onNext != null) {
+                    Surface(
+                        onClick = onNext,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+                        color = design.colors.glassSurface,
+                        border = BorderStroke(1.dp, design.brushes.primaryBorder),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "›",
+                                color = design.colors.textPrimary,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.size(44.dp))
                 }
             }
         }
@@ -1128,7 +1215,7 @@ private fun ThemeCard(
                 modifier = Modifier
                     .size(64.dp)
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(22.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = theme.displayName,
@@ -1189,18 +1276,25 @@ private fun ThemePreviewImage(
 @Composable
 private fun ThemePreviewBackground(
     theme: JGSThemeSpec,
+    cropBiasX: Float = theme.backgrounds.cropBiasX,
+    cropBiasY: Float = theme.backgrounds.cropBiasY,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
         AndroidView(
             factory = { context ->
                 ImageView(context).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    scaleType = ImageView.ScaleType.MATRIX
                     setImageResource(theme.backgrounds.libraryBackgroundRes)
                 }
             },
             update = { imageView ->
                 imageView.setImageResource(theme.backgrounds.libraryBackgroundRes)
+                if (!applyPreviewCropBias(imageView, cropBiasX, cropBiasY)) {
+                    imageView.post {
+                        applyPreviewCropBias(imageView, cropBiasX, cropBiasY)
+                    }
+                }
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -1213,6 +1307,46 @@ private fun ThemePreviewBackground(
                 )
         )
     }
+}
+
+private fun applyPreviewCropBias(imageView: ImageView, biasX: Float, biasY: Float): Boolean {
+    val drawable = imageView.drawable ?: return false
+    val viewW = imageView.width.toFloat()
+    val viewH = imageView.height.toFloat()
+    if (viewW <= 0f || viewH <= 0f) return false
+
+    val dw = drawable.intrinsicWidth.toFloat()
+    val dh = drawable.intrinsicHeight.toFloat()
+    if (dw <= 0f || dh <= 0f) return false
+
+    val viewRatio = viewW / viewH
+    val imgRatio = dw / dh
+    val bias = biasX.coerceIn(0f, 1f)
+    val biasYClamped = biasY.coerceIn(0f, 1f)
+
+    val scale: Float
+    val dx: Float
+    val dy: Float
+
+    if (imgRatio > viewRatio) {
+        scale = viewH / dh
+        val scaledW = dw * scale
+        val scaledH = dh * scale
+        dx = (viewW - scaledW) * bias
+        dy = (viewH - scaledH) * biasYClamped
+    } else {
+        scale = viewW / dw
+        val scaledW = dw * scale
+        val scaledH = dh * scale
+        dx = (viewW - scaledW) * bias
+        dy = (viewH - scaledH) * biasYClamped
+    }
+
+    imageView.imageMatrix = android.graphics.Matrix().apply {
+        setScale(scale, scale)
+        postTranslate(dx, dy)
+    }
+    return true
 }
 
 @Composable
@@ -1283,6 +1417,18 @@ private fun SearchField(
                 color = labelColor,
                 style = MaterialTheme.typography.titleMedium
             )
+        },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                Text(
+                    text = "✕",
+                    color = labelColor,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .clickable { onValueChange("") }
+                        .padding(horizontal = 6.dp)
+                )
+            }
         },
         textStyle = MaterialTheme.typography.bodyLarge,
         singleLine = true,

@@ -23,6 +23,15 @@ enum class JGSThemeKey {
     MAUSOLEUM_FOUR,
     MAUSOLEUM_FIVE,
     MAUSOLEUM_SIX,
+    MAUSOLEUM_SEVEN,
+    MAUSOLEUM_EIGHT,
+    MAUSOLEUM_NINE,
+    MAUSOLEUM_TEN,
+    MAUSOLEUM_ELEVEN,
+    MAUSOLEUM_TWELVE,
+    MAUSOLEUM_THIRTEEN,
+    MAUSOLEUM_FOURTEEN,
+    MAUSOLEUM_FIFTEEN,
     GRASSLAND,
     GRASSLAND_TWO,
     SUN_DESERT
@@ -43,7 +52,8 @@ data class JGSBackgroundTokens(
     @param:DrawableRes val libraryBackgroundRes: Int,
     @param:DrawableRes val playerBackgroundRes: Int,
     val overlayAlpha: Float = 0.55f,
-    val cropBiasX: Float = 0.5f
+    val cropBiasX: Float = 0.5f,
+    val cropBiasY: Float = 0.5f
 )
 
 @Immutable
@@ -1132,6 +1142,13 @@ private val MausoleumThemeOne = JGSThemeSpec(
                     Color(0xFFB58F58),
                     Color(0xFFF0E1C0)
                 )
+            ),
+            appBackground = Brush.verticalGradient(
+                listOf(
+                    Color(0xCC1E1E1C),
+                    Color(0xCC2A2520),
+                    Color(0xB31A1917)
+                )
             )
         )
     ),
@@ -1224,6 +1241,150 @@ private val MausoleumThemeSix = JGSThemeSpec(
     )
 )
 
+private val MausoleumThemeSeven = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_SEVEN,
+    displayName = "Mausoleum VII",
+    buttonLabel = "Maus VII",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series VII.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_7,
+        playerBackgroundRes = R.drawable.bg_mausoleum_7,
+        overlayAlpha = 0.58f,
+        cropBiasX = 0.9f
+    )
+)
+
+private val MausoleumThemeEight = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_EIGHT,
+    displayName = "Mausoleum VIII",
+    buttonLabel = "Maus VIII",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series VIII.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_8,
+        playerBackgroundRes = R.drawable.bg_mausoleum_8,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeNine = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_NINE,
+    displayName = "Mausoleum IX",
+    buttonLabel = "Maus IX",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series IX.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_9,
+        playerBackgroundRes = R.drawable.bg_mausoleum_9,
+        overlayAlpha = 0.58f,
+        cropBiasX = 0.4f
+    )
+)
+
+private val MausoleumThemeTen = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_TEN,
+    displayName = "Mausoleum X",
+    buttonLabel = "Maus X",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series X.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_10,
+        playerBackgroundRes = R.drawable.bg_mausoleum_10,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeEleven = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_ELEVEN,
+    displayName = "Mausoleum XI",
+    buttonLabel = "Maus XI",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series XI.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_11,
+        playerBackgroundRes = R.drawable.bg_mausoleum_11,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeTwelve = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_TWELVE,
+    displayName = "Mausoleum XII",
+    buttonLabel = "Maus XII",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series XII.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_12,
+        playerBackgroundRes = R.drawable.bg_mausoleum_12,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeThirteen = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_THIRTEEN,
+    displayName = "Mausoleum XIII",
+    buttonLabel = "Maus XIII",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series XIII.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_13,
+        playerBackgroundRes = R.drawable.bg_mausoleum_13,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeFourteen = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_FOURTEEN,
+    displayName = "Mausoleum XIV",
+    buttonLabel = "Maus XIV",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series XIV.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_14,
+        playerBackgroundRes = R.drawable.bg_mausoleum_14,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
+private val MausoleumThemeFifteen = JGSThemeSpec(
+    key = JGSThemeKey.MAUSOLEUM_FIFTEEN,
+    displayName = "Mausoleum XV",
+    buttonLabel = "Maus XV",
+    group = JGSThemeGroup.MAUSOLEUM,
+    description = "Mausoleum series XV.",
+    designTokens = MausoleumThemeOne.designTokens,
+    typography = MausoleumThemeOne.typography,
+    backgrounds = JGSBackgroundTokens(
+        libraryBackgroundRes = R.drawable.bg_mausoleum_15,
+        playerBackgroundRes = R.drawable.bg_mausoleum_15,
+        overlayAlpha = 0.58f,
+        cropBiasX = 1f
+    )
+)
+
 object JGSThemes {
     val all: List<JGSThemeSpec> = listOf(
         DeepOceanTheme,
@@ -1240,6 +1401,15 @@ object JGSThemes {
         MausoleumThemeFour,
         MausoleumThemeFive,
         MausoleumThemeSix,
+        MausoleumThemeSeven,
+        MausoleumThemeEight,
+        MausoleumThemeNine,
+        MausoleumThemeTen,
+        MausoleumThemeEleven,
+        MausoleumThemeTwelve,
+        MausoleumThemeThirteen,
+        MausoleumThemeFourteen,
+        MausoleumThemeFifteen,
         SunriverTheme,
         FrostpeakTheme
     )
