@@ -126,15 +126,10 @@ private fun ThemeGroupTile(
     val design = JGSTheme.design
     val previewTheme = remember(group) { JGSThemes.byGroup(group).firstOrNull() }
 
-    Surface(
+    ThemeGlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpenGroup(group) },
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
-        color = design.colors.glassSurface,
-        border = BorderStroke(1.dp, design.brushes.primaryBorder),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -402,18 +397,13 @@ private fun ThemeCard(
     onOpen: () -> Unit,
     onApply: () -> Unit
 ) {
-    val design = JGSTheme.design
-
-    Surface(
+    ThemeGlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpen() },
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
-        color = design.colors.glassSurface,
-        border = BorderStroke(1.dp, design.brushes.primaryBorder),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
     ) {
+        val design = JGSTheme.design
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -456,6 +446,25 @@ private fun ThemeCard(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ThemeGlassCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val design = JGSTheme.design
+
+    Surface(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+        color = design.colors.glassSurface,
+        border = BorderStroke(1.dp, design.brushes.primaryBorder),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        content()
     }
 }
 
