@@ -45,6 +45,7 @@ import com.example.jgsmusicplayer.model.AudioFile
 import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
 import com.example.jgsmusicplayer.ui.components.BottomGlassActionButton
+import com.example.jgsmusicplayer.ui.components.ErrorBanner
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.components.SearchField
 import com.example.jgsmusicplayer.ui.components.SeaDivider
@@ -209,37 +210,11 @@ fun Mp3BrowserAndPlayer(
                 }
 
                 uiState.errorMessage?.let { errorMessage ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
-                        color = design.colors.errorSurface,
-                        border = BorderStroke(
-                            1.dp,
-                            design.brushes.errorBorder
-                        ),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = errorMessage,
-                                color = textPrimary,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "Dismiss",
-                                color = textPrimary,
-                                modifier = Modifier.clickable { onDismissError() },
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                    }
+                    ErrorBanner(
+                        message = errorMessage,
+                        onDismiss = onDismissError,
+                        textColor = textPrimary
+                    )
                     Spacer(Modifier.height(design.sizes.sectionSpacingMedium))
                 }
 

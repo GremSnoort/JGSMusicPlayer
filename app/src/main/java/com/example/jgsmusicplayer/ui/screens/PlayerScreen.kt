@@ -50,6 +50,7 @@ import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.components.ArcSeekBar
+import com.example.jgsmusicplayer.ui.components.ErrorBanner
 import com.example.jgsmusicplayer.ui.components.edgeSwipeBackModifier
 import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
 import com.example.jgsmusicplayer.ui.theme.JGSTheme
@@ -131,38 +132,18 @@ fun PlayerScreen(
                     }
 
                     uiState.errorMessage?.let { errorMessage ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(design.shapes.cardCorner),
-                            color = design.colors.errorSurface,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                design.brushes.errorBorder
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = design.sizes.sectionSpacingMedium,
-                                        vertical = design.sizes.sectionSpacingSmall
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = errorMessage,
-                                    color = design.colors.textPrimary,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Text(
-                                    text = "Dismiss",
-                                    color = design.colors.textPrimary.copy(alpha = 0.92f),
-                                    modifier = Modifier
-                                        .padding(start = design.sizes.sectionSpacingSmall)
-                                        .clickable { onDismissError() }
-                                )
-                            }
-                        }
+                        ErrorBanner(
+                            message = errorMessage,
+                            onDismiss = onDismissError,
+                            dismissTextColor = design.colors.textPrimary.copy(alpha = 0.92f),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = design.sizes.sectionSpacingMedium,
+                                vertical = design.sizes.sectionSpacingSmall
+                            ),
+                            dismissStartPadding = design.sizes.sectionSpacingSmall,
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            dismissTextStyle = MaterialTheme.typography.bodyMedium
+                        )
 
                         Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
                     }

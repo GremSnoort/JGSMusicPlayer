@@ -7,6 +7,8 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -173,6 +175,55 @@ fun SeaDivider(
             .height(height)
             .background(brush)
     )
+}
+
+@Composable
+fun ErrorBanner(
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    textColor: Color = JGSTheme.design.colors.textPrimary,
+    dismissTextColor: Color = JGSTheme.design.colors.textPrimary,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+    dismissStartPadding: Dp = 0.dp,
+    textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium,
+    dismissTextStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelMedium
+) {
+    val design = JGSTheme.design
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+        color = design.colors.errorSurface,
+        border = BorderStroke(
+            1.dp,
+            design.brushes.errorBorder
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(contentPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                color = textColor,
+                modifier = Modifier.weight(1f),
+                style = textStyle
+            )
+            Text(
+                text = "Dismiss",
+                color = dismissTextColor,
+                modifier = Modifier
+                    .padding(start = dismissStartPadding)
+                    .clickable { onDismiss() },
+                style = dismissTextStyle
+            )
+        }
+    }
 }
 
 @Composable
