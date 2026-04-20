@@ -23,9 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,14 +45,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 
 import com.example.jgsmusicplayer.model.PlayerActions
 import com.example.jgsmusicplayer.model.PlayerUiState
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.components.ArcSeekBar
+import com.example.jgsmusicplayer.ui.components.edgeSwipeBackModifier
 import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
 import com.example.jgsmusicplayer.ui.theme.JGSTheme
 import com.example.jgsmusicplayer.ui.theme.JGSThemedBackground
@@ -100,19 +95,6 @@ fun PlayerScreen(
     val sliderValue = (seekPreviewMs.coerceIn(0L, safeDuration)).toFloat() / safeDuration.toFloat()
     val screenInset = design.sizes.playerScreenInset
 
-    // --- swipe from RIGHT edge to go back ---
-    val density = LocalDensity.current
-    val cfg = LocalConfiguration.current
-    val screenWidthPx = with(density) { cfg.screenWidthDp.dp.toPx() }
-
-    val edgePx = with(density) { design.sizes.edgeSwipeZone.toPx() }
-    val triggerPx = with(density) { design.sizes.edgeSwipeTrigger.toPx() }
-
-    var dragSum by remember { mutableStateOf(0f) }
-    var backTriggered by remember { mutableStateOf(false) }
-    var isEdgeDrag by remember { mutableStateOf(false) }
-    // ---------------------------------------
-
     Box(modifier = Modifier.fillMaxSize()) {
         JGSThemedBackground(
             target = JGSBackgroundTarget.PLAYER,
@@ -123,30 +105,7 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = screenInset, bottom = screenInset)
-                .pointerInput(uiState.nowPlaying) {}
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        if (!isEdgeDrag || backTriggered) return@rememberDraggableState
-                        dragSum += delta
-                        if (dragSum <= -triggerPx) {
-                            backTriggered = true
-                            onBack()
-                        }
-                    },
-                    onDragStarted = { startOffset ->
-                        dragSum = 0f
-                        backTriggered = false
-
-                        val fromRight = startOffset.x >= (screenWidthPx - edgePx)
-                        isEdgeDrag = fromRight
-                    },
-                    onDragStopped = {
-                        isEdgeDrag = false
-                        dragSum = 0f
-                        backTriggered = false
-                    }
-                )
+                .then(edgeSwipeBackModifier(onBack))
         ) {
             Scaffold(
                 containerColor = design.colors.transparent,
