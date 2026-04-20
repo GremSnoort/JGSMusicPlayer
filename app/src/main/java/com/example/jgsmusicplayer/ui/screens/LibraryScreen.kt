@@ -183,30 +183,15 @@ fun Mp3BrowserAndPlayer(
                     .fillMaxSize()
             ) {
                 if (!hasPermission) {
-                    Text(
-                        "No permission to access the audio",
-                        color = textSecondary,
-                        style = MaterialTheme.typography.bodyLarge
+                    LibraryEmptyActionBlock(
+                        message = "No permission to access the audio",
+                        actionLabel = "Allow",
+                        messageColor = textSecondary,
+                        actionTextColor = textPrimary,
+                        actionBorder = seaBorder,
+                        actionBackground = glassBg,
+                        onActionClick = onRequestPermission
                     )
-                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
-                    Surface(
-                        onClick = onRequestPermission,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner - 2.dp),
-                        color = glassBg,
-                        border = BorderStroke(1.dp, seaBorder),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        Text(
-                            "Allow",
-                            modifier = Modifier.padding(
-                                horizontal = design.sizes.screenContentPadding,
-                                vertical = design.sizes.sectionSpacingSmall
-                            ),
-                            color = textPrimary,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
                     return@Column
                 }
 
@@ -220,30 +205,15 @@ fun Mp3BrowserAndPlayer(
                 }
 
                 if (files.isEmpty()) {
-                    Text(
-                        "MP3 not found",
-                        color = textSecondary,
-                        style = MaterialTheme.typography.bodyLarge
+                    LibraryEmptyActionBlock(
+                        message = "MP3 not found",
+                        actionLabel = "Refresh",
+                        messageColor = textSecondary,
+                        actionTextColor = textPrimary,
+                        actionBorder = seaBorder,
+                        actionBackground = glassBg,
+                        onActionClick = onRefreshFiles
                     )
-                    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
-                    Surface(
-                        onClick = onRefreshFiles,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner - 2.dp),
-                        color = glassBg,
-                        border = BorderStroke(1.dp, seaBorder),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        Text(
-                            "Refresh",
-                            modifier = Modifier.padding(
-                                horizontal = design.sizes.screenContentPadding,
-                                vertical = design.sizes.sectionSpacingSmall
-                            ),
-                            color = textPrimary,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
                     return@Column
                 }
 
@@ -542,6 +512,44 @@ private fun <T> LibraryListWithDividers(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryEmptyActionBlock(
+    message: String,
+    actionLabel: String,
+    messageColor: androidx.compose.ui.graphics.Color,
+    actionTextColor: androidx.compose.ui.graphics.Color,
+    actionBorder: Brush,
+    actionBackground: androidx.compose.ui.graphics.Color,
+    onActionClick: () -> Unit
+) {
+    val design = JGSTheme.design
+
+    Text(
+        text = message,
+        color = messageColor,
+        style = MaterialTheme.typography.bodyLarge
+    )
+    Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
+    Surface(
+        onClick = onActionClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner - 2.dp),
+        color = actionBackground,
+        border = BorderStroke(1.dp, actionBorder),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Text(
+            text = actionLabel,
+            modifier = Modifier.padding(
+                horizontal = design.sizes.screenContentPadding,
+                vertical = design.sizes.sectionSpacingSmall
+            ),
+            color = actionTextColor,
+            style = MaterialTheme.typography.titleMedium
+        )
     }
 }
 
