@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -341,89 +342,79 @@ fun Mp3BrowserAndPlayer(
                         )
                     }
 
-                    LazyColumn(
-                        state = libraryListState,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        if (globalQuery.isBlank()) {
-                            val keys = folders.keys.toList()
-                            items(keys.size) { index ->
-                                val folder = keys[index]
+                    if (globalQuery.isBlank()) {
+                        val foldersList = folders.keys.toList()
 
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            selectedFolder = folder
-                                            query = ""
-                                        }
-                                        .padding(
-                                            vertical = design.sizes.listItemVerticalPadding,
-                                            horizontal = design.sizes.listItemHorizontalPadding
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            folder.ifBlank { "/" },
-                                            color = textPrimary,
-                                            style = MaterialTheme.typography.bodyLarge.copy(
-                                                shadow = listTextShadow
-                                            )
-                                        )
-                                        Text(
-                                            "${folders[folder]?.size ?: 0} file(s)",
-                                            color = textSecondary,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                shadow = listTextShadow
-                                            )
-                                        )
+                        LibraryListWithDividers(
+                            items = foldersList,
+                            state = libraryListState,
+                            dividerBrush = seaBorder,
+                            dividerPadding = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
+                            modifier = Modifier.fillMaxSize()
+                        ) { folder ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedFolder = folder
+                                        query = ""
                                     }
-                                }
-
-                                if (index != keys.lastIndex) {
-                                    SeaDivider(
-                                        modifier = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
-                                        brush = seaBorder
+                                    .padding(
+                                        vertical = design.sizes.listItemVerticalPadding,
+                                        horizontal = design.sizes.listItemHorizontalPadding
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        folder.ifBlank { "/" },
+                                        color = textPrimary,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            shadow = listTextShadow
+                                        )
+                                    )
+                                    Text(
+                                        "${folders[folder]?.size ?: 0} file(s)",
+                                        color = textSecondary,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            shadow = listTextShadow
+                                        )
                                     )
                                 }
                             }
-                        } else {
-                            items(globalResults.size) { index ->
-                                val file = globalResults[index]
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { actions.playTrack(file) }
-                                        .padding(
-                                            vertical = design.sizes.listItemVerticalPadding,
-                                            horizontal = design.sizes.listItemHorizontalPadding
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            file.name,
-                                            color = textPrimary,
-                                            style = MaterialTheme.typography.bodyLarge.copy(
-                                                shadow = listTextShadow
-                                            )
+                        }
+                    } else {
+                        LibraryListWithDividers(
+                            items = globalResults,
+                            state = libraryListState,
+                            dividerBrush = seaBorder,
+                            dividerPadding = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
+                            modifier = Modifier.fillMaxSize()
+                        ) { file ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { actions.playTrack(file) }
+                                    .padding(
+                                        vertical = design.sizes.listItemVerticalPadding,
+                                        horizontal = design.sizes.listItemHorizontalPadding
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        file.name,
+                                        color = textPrimary,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            shadow = listTextShadow
                                         )
-                                        Text(
-                                            file.folder.ifBlank { "/" },
-                                            color = textSecondary,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                shadow = listTextShadow
-                                            )
+                                    )
+                                    Text(
+                                        file.folder.ifBlank { "/" },
+                                        color = textSecondary,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            shadow = listTextShadow
                                         )
-                                    }
-                                }
-
-                                if (index != globalResults.lastIndex) {
-                                    SeaDivider(
-                                        modifier = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
-                                        brush = seaBorder
                                     )
                                 }
                             }
@@ -493,42 +484,62 @@ fun Mp3BrowserAndPlayer(
                         }
                     }
 
-                    LazyColumn(
+                    LibraryListWithDividers(
+                        items = filtered,
                         state = folderListState,
+                        dividerBrush = seaBorder,
+                        dividerPadding = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
                         modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(filtered.size) { index ->
-                            val file = filtered[index]
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { actions.playTrack(file) }
-                                    .padding(
-                                        vertical = design.sizes.listItemVerticalPadding,
-                                        horizontal = design.sizes.listItemHorizontalPadding
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    file.name,
-                                    color = textPrimary,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        shadow = listTextShadow
-                                    )
+                    ) { file ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { actions.playTrack(file) }
+                                .padding(
+                                    vertical = design.sizes.listItemVerticalPadding,
+                                    horizontal = design.sizes.listItemHorizontalPadding
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                file.name,
+                                color = textPrimary,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    shadow = listTextShadow
                                 )
-                            }
-
-                            if (index != filtered.lastIndex) {
-                                SeaDivider(
-                                    modifier = Modifier.padding(horizontal = design.sizes.listItemHorizontalPadding),
-                                    brush = seaBorder
-                                )
-                            }
+                            )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> LibraryListWithDividers(
+    items: List<T>,
+    state: LazyListState,
+    dividerBrush: Brush,
+    modifier: Modifier = Modifier,
+    dividerPadding: Modifier = Modifier,
+    itemContent: @Composable (T) -> Unit
+) {
+    LazyColumn(
+        state = state,
+        modifier = modifier
+    ) {
+        items(items.size) { index ->
+            val item = items[index]
+
+            itemContent(item)
+
+            if (index != items.lastIndex) {
+                SeaDivider(
+                    modifier = dividerPadding,
+                    brush = dividerBrush
+                )
             }
         }
     }
