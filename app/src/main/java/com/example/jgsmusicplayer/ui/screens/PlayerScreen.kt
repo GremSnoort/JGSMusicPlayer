@@ -57,20 +57,34 @@ import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
 import com.example.jgsmusicplayer.ui.theme.JGSTheme
 import com.example.jgsmusicplayer.ui.theme.JGSThemedBackground
 
-private fun formatMs(ms: Long): String {
-    if (ms <= 0) return "0:00"
-    val totalSec = ms / 1000
+private enum class PlaybackTimeFormat {
+    ELAPSED,
+    REMAINING
+}
+
+private fun formatPlaybackTime(
+    ms: Long,
+    format: PlaybackTimeFormat = PlaybackTimeFormat.ELAPSED
+): String {
+    val safeMs = ms.coerceAtLeast(0L)
+    if (safeMs <= 0L) {
+        return if (format == PlaybackTimeFormat.REMAINING) "-0:00" else "0:00"
+    }
+
+    val totalSec = safeMs / 1000
     val min = totalSec / 60
     val sec = totalSec % 60
-    return "${min}:${sec.toString().padStart(2, '0')}"
+    val prefix = if (format == PlaybackTimeFormat.REMAINING) "-" else ""
+    return "${prefix}${min}:${sec.toString().padStart(2, '0')}"
+}
+
+private fun formatMs(ms: Long): String {
+    return formatPlaybackTime(ms)
 }
 
 private fun formatRemainingMs(positionMs: Long, durationMs: Long): String {
     val remain = (durationMs - positionMs).coerceAtLeast(0L)
-    val totalSec = remain / 1000
-    val min = totalSec / 60
-    val sec = totalSec % 60
-    return "-${min}:${sec.toString().padStart(2, '0')}"
+    return formatPlaybackTime(remain, PlaybackTimeFormat.REMAINING)
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
