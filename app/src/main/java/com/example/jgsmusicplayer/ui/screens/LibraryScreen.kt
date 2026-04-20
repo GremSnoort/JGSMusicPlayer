@@ -266,50 +266,30 @@ fun Mp3BrowserAndPlayer(
                 }
 
                 if (selectedFolder == null) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
-                        color = glassBg,
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        SearchField(
-                            value = globalQuery,
-                            onValueChange = { globalQuery = it },
-                            label = "Search all tracks",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    horizontal = design.sizes.screenContentPadding,
-                                    vertical = design.sizes.sectionSpacingSmall
-                                ),
-                            textColor = textPrimary,
-                            labelColor = textSecondary,
-                            cursorColor = design.colors.seekKnob,
-                            onDone = { focusManager.clearFocus() }
-                        )
-                    }
+                    LibrarySearchFieldCard(
+                        value = globalQuery,
+                        onValueChange = { globalQuery = it },
+                        label = "Search all tracks",
+                        textColor = textPrimary,
+                        labelColor = textSecondary,
+                        cursorColor = design.colors.seekKnob,
+                        backgroundColor = glassBg,
+                        onDone = { focusManager.clearFocus() }
+                    )
 
                     Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
 
-                    val globalResults = remember(files, globalQuery) {
-                        if (globalQuery.isBlank()) {
-                            emptyList()
-                        } else {
-                            files.filter { file ->
-                                file.name.contains(globalQuery, ignoreCase = true) ||
-                                    file.folder.contains(globalQuery, ignoreCase = true)
-                            }
-                        }
+                    val globalResults = rememberLibrarySearchResults(
+                        items = files,
+                        query = globalQuery,
+                        showAllWhenBlank = false
+                    ) { file, searchQuery ->
+                        file.name.contains(searchQuery, ignoreCase = true) ||
+                            file.folder.contains(searchQuery, ignoreCase = true)
                     }
 
                     if (globalQuery.isNotBlank() && globalResults.isEmpty()) {
-                        Text(
-                            "Nothing found",
-                            color = textSecondary,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        LibraryNothingFoundMessage(textColor = textSecondary)
                     }
 
                     if (globalQuery.isBlank()) {
@@ -403,44 +383,30 @@ fun Mp3BrowserAndPlayer(
                         )
                     }
 
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
-                        color = glassBg,
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        SearchField(
-                            value = query,
-                            onValueChange = { query = it },
-                            label = "Search",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    horizontal = design.sizes.screenContentPadding,
-                                    vertical = design.sizes.sectionSpacingSmall
-                                ),
-                            textColor = textPrimary,
-                            labelColor = textSecondary,
-                            cursorColor = design.colors.seekKnob,
-                            onDone = { focusManager.clearFocus() }
-                        )
-                    }
+                    LibrarySearchFieldCard(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = "Search",
+                        textColor = textPrimary,
+                        labelColor = textSecondary,
+                        cursorColor = design.colors.seekKnob,
+                        backgroundColor = glassBg,
+                        onDone = { focusManager.clearFocus() }
+                    )
 
                     Spacer(Modifier.height(design.sizes.sectionSpacingSmall))
 
                     val list = folders[selectedFolder] ?: emptyList()
-                    val filtered = remember(list, query) {
-                        if (query.isBlank()) list else list.filter { it.name.contains(query, ignoreCase = true) }
+                    val filtered = rememberLibrarySearchResults(
+                        items = list,
+                        query = query,
+                        showAllWhenBlank = true
+                    ) { file, searchQuery ->
+                        file.name.contains(searchQuery, ignoreCase = true)
                     }
 
                     if (filtered.isEmpty()) {
-                        Text(
-                            "Nothing found",
-                            color = textSecondary,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        LibraryNothingFoundMessage(textColor = textSecondary)
                     }
 
                     DisposableEffect(currentFolder, folderListState) {
@@ -484,6 +450,70 @@ fun Mp3BrowserAndPlayer(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LibrarySearchFieldCard(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    textColor: androidx.compose.ui.graphics.Color,
+    labelColor: androidx.compose.ui.graphics.Color,
+    cursorColor: androidx.compose.ui.graphics.Color,
+    backgroundColor: androidx.compose.ui.graphics.Color,
+    onDone: () -> Unit
+) {
+    val design = JGSTheme.design
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
+        color = backgroundColor,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        SearchField(
+            value = value,
+            onValueChange = onValueChange,
+            label = label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = design.sizes.screenContentPadding,
+                    vertical = design.sizes.sectionSpacingSmall
+                ),
+            textColor = textColor,
+            labelColor = labelColor,
+            cursorColor = cursorColor,
+            onDone = onDone
+        )
+    }
+}
+
+@Composable
+private fun LibraryNothingFoundMessage(
+    textColor: androidx.compose.ui.graphics.Color
+) {
+    Text(
+        text = "Nothing found",
+        color = textColor,
+        modifier = Modifier.padding(horizontal = 4.dp),
+        style = MaterialTheme.typography.bodyMedium
+    )
+}
+
+@Composable
+private fun <T> rememberLibrarySearchResults(
+    items: List<T>,
+    query: String,
+    showAllWhenBlank: Boolean,
+    matches: (T, String) -> Boolean
+): List<T> = remember(items, query) {
+    if (query.isBlank()) {
+        if (showAllWhenBlank) items else emptyList()
+    } else {
+        items.filter { item -> matches(item, query) }
     }
 }
 
