@@ -95,28 +95,26 @@ fun rememberJGSThemeController(): JGSThemeController {
     val currentTheme = remember(baseTheme, mergedBiasMap) { applyBias(baseTheme, mergedBiasMap) }
 
     return remember(currentTheme, currentThemeKeyName, mergedBiasMap) {
+        fun applyThemeKeyName(keyName: String) {
+            currentThemeKeyName = keyName
+            syncPrefs.edit().putString(SyncThemeKey, keyName).apply()
+            scope.launch {
+                context.themeDataStore.edit { prefs ->
+                    prefs[ThemeKeyPreference] = keyName
+                }
+            }
+        }
+
         JGSThemeController(
             currentTheme = currentTheme,
             currentButtonLabel = currentTheme.buttonLabel,
             cycleTheme = {
                 val nextThemeKeyName = JGSThemes.nextTheme(currentTheme).key.name
-                currentThemeKeyName = nextThemeKeyName
-                syncPrefs.edit().putString(SyncThemeKey, nextThemeKeyName).apply()
-                scope.launch {
-                    context.themeDataStore.edit { prefs ->
-                        prefs[ThemeKeyPreference] = nextThemeKeyName
-                    }
-                }
+                applyThemeKeyName(nextThemeKeyName)
             },
             setTheme = { key ->
                 val keyName = key.name
-                currentThemeKeyName = keyName
-                syncPrefs.edit().putString(SyncThemeKey, keyName).apply()
-                scope.launch {
-                    context.themeDataStore.edit { prefs ->
-                        prefs[ThemeKeyPreference] = keyName
-                    }
-                }
+                applyThemeKeyName(keyName)
             },
             getThemeBias = { key -> biasMap[key] },
             setThemeBias = { key, bias ->
