@@ -115,10 +115,7 @@ private fun App(
         {
             val returned = navController.popBackStack("library", inclusive = false)
             if (!returned) {
-                navController.navigate("library") {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
-                    launchSingleTop = true
-                }
+                navigateToLibrary(navController)
             }
         }
     }
@@ -127,10 +124,7 @@ private fun App(
         {
             val returned = navController.popBackStack()
             if (!returned) {
-                navController.navigate("library") {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
-                    launchSingleTop = true
-                }
+                navigateToLibrary(navController)
             }
         }
     }
@@ -267,5 +261,12 @@ private fun requiredAudioPermission(): String {
         Manifest.permission.READ_MEDIA_AUDIO
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+}
+
+private fun navigateToLibrary(navController: androidx.navigation.NavHostController) {
+    navController.navigate("library") {
+        popUpTo(navController.graph.startDestinationId) { inclusive = false }
+        launchSingleTop = true
     }
 }
