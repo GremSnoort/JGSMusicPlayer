@@ -51,6 +51,7 @@ import com.example.jgsmusicplayer.model.PlayerUiState
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
 import com.example.jgsmusicplayer.ui.components.ArcSeekBar
 import com.example.jgsmusicplayer.ui.components.ErrorBanner
+import com.example.jgsmusicplayer.ui.components.GlassTextButton
 import com.example.jgsmusicplayer.ui.components.edgeSwipeBackModifier
 import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
 import com.example.jgsmusicplayer.ui.theme.JGSTheme
@@ -295,34 +296,23 @@ private fun GlassButton(
     val design = JGSTheme.design
     val shape = RoundedCornerShape(design.shapes.smallButtonCorner)
 
-    Surface(
+    GlassTextButton(
+        text = text,
+        onClick = onClick,
         modifier = modifier.height(height),
         shape = shape,
-        color = design.colors.glassSurface,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
+        surfaceColor = design.colors.glassSurface,
+        textColor = design.colors.textPrimary.copy(alpha = 0.88f),
+        textStyle = MaterialTheme.typography.titleMedium.copy(
+            fontSize = design.text.buttonLabel.fontSize,
+            fontWeight = FontWeight.SemiBold
+        ),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             design.brushes.controlInactiveBorder
         ),
-        onClick = onClick
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                color = design.colors.textPrimary.copy(alpha = 0.88f),
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = design.text.buttonLabel.fontSize,
-                    fontWeight = FontWeight.SemiBold
-                )
-            )
-        }
-    }
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)
+    )
 }
 
 @Composable

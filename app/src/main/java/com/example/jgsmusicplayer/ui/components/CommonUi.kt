@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -137,12 +139,11 @@ fun BottomGlassActionButton(
 ) {
     val design = JGSTheme.design
 
-    Surface(
+    GlassActionSurface(
         onClick = onClick,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.fabCorner),
-        color = design.colors.transparent,
+        surfaceColor = design.colors.transparent,
         border = BorderStroke(1.dp, design.brushes.primaryBorder),
-        tonalElevation = 0.dp,
         shadowElevation = 10.dp
     ) {
         Box(
@@ -158,6 +159,69 @@ fun BottomGlassActionButton(
                 text = text,
                 color = design.colors.textOnAccent,
                 style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
+}
+
+@Composable
+fun GlassActionSurface(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape,
+    surfaceColor: Color,
+    border: BorderStroke? = null,
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        onClick = onClick,
+        shape = shape,
+        color = surfaceColor,
+        border = border,
+        tonalElevation = tonalElevation,
+        shadowElevation = shadowElevation
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun GlassTextButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape,
+    surfaceColor: Color,
+    textColor: Color,
+    textStyle: TextStyle,
+    border: BorderStroke? = null,
+    contentPadding: PaddingValues,
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp,
+    fillContentWidth: Boolean = false
+) {
+    GlassActionSurface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = shape,
+        surfaceColor = surfaceColor,
+        border = border,
+        tonalElevation = tonalElevation,
+        shadowElevation = shadowElevation
+    ) {
+        Box(
+            modifier = Modifier
+                .then(if (fillContentWidth) Modifier.fillMaxWidth() else Modifier)
+                .padding(contentPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                color = textColor,
+                style = textStyle
             )
         }
     }

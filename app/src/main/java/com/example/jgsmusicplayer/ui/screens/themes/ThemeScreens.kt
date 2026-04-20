@@ -44,6 +44,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 
 import com.example.jgsmusicplayer.ui.components.NeonTopBar
+import com.example.jgsmusicplayer.ui.components.GlassTextButton
 import com.example.jgsmusicplayer.ui.components.edgeSwipeBackModifier
 import com.example.jgsmusicplayer.ui.theme.JGSBackgroundTarget
 import com.example.jgsmusicplayer.ui.theme.JGSMusicPlayerTheme
@@ -321,27 +322,20 @@ fun ThemeDetailScreen(
                             )
                         }
 
-                        Surface(
+                        GlassTextButton(
+                            text = if (isActive) "Applied" else "Apply",
                             onClick = {
                                 onSetThemeBias(theme.key, ThemeBias(biasX, biasY))
                                 onApply()
                             },
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.cardCorner),
-                            color = design.colors.transparent,
                             border = BorderStroke(1.dp, design.brushes.primaryBorder),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp
-                        ) {
-                            Text(
-                                text = if (isActive) "Applied" else "Apply",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                textAlign = TextAlign.Center,
-                                color = design.colors.textPrimary,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
+                            surfaceColor = design.colors.transparent,
+                            textColor = design.colors.textPrimary,
+                            textStyle = MaterialTheme.typography.titleMedium,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
+                            fillContentWidth = true
+                        )
                     }
                 }
             }
@@ -451,21 +445,16 @@ private fun ThemeCard(
                     )
                 }
             }
-            Surface(
+            GlassTextButton(
+                text = if (isActive) "Applied" else "Use",
                 onClick = onApply,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(design.shapes.smallButtonCorner),
-                color = design.colors.transparent,
                 border = BorderStroke(1.dp, design.brushes.primaryBorder),
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
-            ) {
-                Text(
-                    text = if (isActive) "Applied" else "Use",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    color = design.colors.textOnAccent,
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-                )
-            }
+                surfaceColor = design.colors.transparent,
+                textColor = design.colors.textOnAccent,
+                textStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            )
         }
     }
 }
