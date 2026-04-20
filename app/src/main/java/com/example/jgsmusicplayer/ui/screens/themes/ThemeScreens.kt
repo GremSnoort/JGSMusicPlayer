@@ -526,41 +526,5 @@ private fun ThemePreviewBackground(
 }
 
 private fun applyPreviewCropBias(imageView: ImageView, biasX: Float, biasY: Float): Boolean {
-    val drawable = imageView.drawable ?: return false
-    val viewW = imageView.width.toFloat()
-    val viewH = imageView.height.toFloat()
-    if (viewW <= 0f || viewH <= 0f) return false
-
-    val dw = drawable.intrinsicWidth.toFloat()
-    val dh = drawable.intrinsicHeight.toFloat()
-    if (dw <= 0f || dh <= 0f) return false
-
-    val viewRatio = viewW / viewH
-    val imgRatio = dw / dh
-    val bias = biasX.coerceIn(0f, 1f)
-    val biasYClamped = biasY.coerceIn(0f, 1f)
-
-    val scale: Float
-    val dx: Float
-    val dy: Float
-
-    if (imgRatio > viewRatio) {
-        scale = viewH / dh
-        val scaledW = dw * scale
-        val scaledH = dh * scale
-        dx = (viewW - scaledW) * bias
-        dy = (viewH - scaledH) * biasYClamped
-    } else {
-        scale = viewW / dw
-        val scaledW = dw * scale
-        val scaledH = dh * scale
-        dx = (viewW - scaledW) * bias
-        dy = (viewH - scaledH) * biasYClamped
-    }
-
-    imageView.imageMatrix = android.graphics.Matrix().apply {
-        setScale(scale, scale)
-        postTranslate(dx, dy)
-    }
-    return true
+    return com.example.jgsmusicplayer.ui.theme.applyBiasedImageCrop(imageView, biasX, biasY)
 }
